@@ -30,6 +30,8 @@ var (
 	initialization_failed_error = errors.New("Totp has not been initialized correctly")
 )
 
+// WARNING: The `Totp` struct should never be instantiated manually!
+// Use the `NewTOTP` function
 type Totp struct {
 	key                       []byte             // this is the secret key
 	counter                   [counter_size]byte // this is the counter used to synchronize with the client device
