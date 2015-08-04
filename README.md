@@ -1,6 +1,6 @@
 #### Current test status
 
-[![Build Status](https://travis-ci.io/github.com/sec51/twofactor/status.png)](https://travis-ci.io/github.com/sec51/twofactor/status.png)
+[![Build Status](https://travis-ci.org/Sec51/twofactor.svg?branch=master)](https://travis-ci.org/Sec51/twofactor.svg?branch=master)
 
 ## `totp`
 
