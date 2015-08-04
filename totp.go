@@ -23,7 +23,7 @@ import (
 const (
 	BACKOFF_MINUTES = 5 // this is the time to wait before verifying another token
 	MAX_FAILURES    = 3 // total amount of failures, after that the user needs to wait for the backoff time
-	COUNTER_SIZE    = 8
+	COUNTER_SIZE    = 8 // this is defined in the RFC 4226
 )
 
 type totp struct {
