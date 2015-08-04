@@ -26,7 +26,11 @@ const (
 	COUNTER_SIZE    = 8 // this is defined in the RFC 4226
 )
 
-type totp struct {
+var (
+	INITIALIZATION_FAILED = errors.New("Totp has not been initialized correctly")
+)
+
+type Totp struct {
 	key                       []byte             // this is the secret key
 	counter                   [COUNTER_SIZE]byte // this is the counter used to synchronize with the client device
 	digits                    int                // total amount of digits of the code displayed on the device
@@ -43,17 +47,17 @@ type totp struct {
 // Offset can be a negative number as well
 // Usually it's either -1, 0 or 1
 // This is used internally
-func (otp *totp) synchronizeCounter(offset int) {
+func (otp *Totp) synchronizeCounter(offset int) {
 	otp.clientOffset = offset
 }
 
 // Label returns the combination of issuer:account string
-func (otp *totp) label() string {
+func (otp *Totp) label() string {
 	return url.QueryEscape(fmt.Sprintf("%s:%s", otp.issuer, otp.account))
 }
 
 // Counter returns the TOTP's 8-byte counter as unsigned 64-bit integer.
-func (otp *totp) getIntCounter() uint64 {
+func (otp *Totp) getIntCounter() uint64 {
 	return uint64FromBigEndian(otp.counter)
 }
 
@@ -67,7 +71,7 @@ func (otp *totp) getIntCounter() uint64 {
 // it autmatically generates a secret key using the golang crypto rand package. If there is not enough entropy the function returns an error
 // The key is not encrypted in this package. It's a secret key. Therefore if you transfer the key bytes in the network,
 // please take care of protecting the key or in fact all the bytes.
-func NewTOTP(account, issuer string, hash crypto.Hash, digits int) (*totp, error) {
+func NewTOTP(account, issuer string, hash crypto.Hash, digits int) (*Totp, error) {
 
 	keySize := hash.Size()
 	key := make([]byte, keySize)
@@ -87,8 +91,8 @@ func NewTOTP(account, issuer string, hash crypto.Hash, digits int) (*totp, error
 
 // Private function which initialize the TOTP so that it's easier to unit test it
 // Used internnaly
-func makeTOTP(key []byte, account, issuer string, hash crypto.Hash, digits int) (*totp, error) {
-	otp := new(totp)
+func makeTOTP(key []byte, account, issuer string, hash crypto.Hash, digits int) (*Totp, error) {
+	otp := new(Totp)
 	otp.key = key
 	otp.account = account
 	otp.issuer = issuer
@@ -108,7 +112,12 @@ func makeTOTP(key []byte, account, issuer string, hash crypto.Hash, digits int) 
 // There is a very basic method which protects from timing attacks, although if the step time used is low it should not be necessary
 // An attacker can still learn the synchronization offset. This is however irrelevant because the attacker has then 30 seconds to
 // guess the code and after 3 failures the function returns an error for the following 5 minutes
-func (otp *totp) Validate(userCode string) error {
+func (otp *Totp) Validate(userCode string) error {
+
+	// check Totp initialization
+	if err := totpHasBeenInitialized(otp); err != nil {
+		return err
+	}
 
 	// verify that the token is valid
 	if userCode == "" {
@@ -177,7 +186,7 @@ func validBackoffTime(lastVerification time.Time) bool {
 // For example, with T0 = 0 and Time Step X = 30, T = 1 if the current
 // Unix time is 59 seconds, and T = 2 if the current Unix time is
 // 60 seconds.
-func (otp *totp) incrementCounter(index int) {
+func (otp *Totp) incrementCounter(index int) {
 	// Unix returns t as a Unix time, the number of seconds elapsed since January 1, 1970 UTC.
 	counterOffset := time.Duration(index*otp.stepSize) * time.Second
 	clientOffset := time.Duration(otp.clientOffset*otp.stepSize) * time.Second
@@ -193,14 +202,20 @@ func increment(ts int64, stepSize int) uint64 {
 }
 
 // Generates a new one time password with hmac-(HASH-FUNCTION)
-func (otp *totp) OTP() string {
+func (otp *Totp) OTP() (string, error) {
+
+	// verify the proper initialization
+	if err := totpHasBeenInitialized(otp); err != nil {
+		return "", err
+	}
+
 	// it uses the index 0, meaning that it calculates the current one
-	return calculateTOTP(otp, 0)
+	return calculateTOTP(otp, 0), nil
 }
 
 // Private function which calculates the OTP token based on the index offset
 // example: 1 * steps or -1 * steps
-func calculateTOTP(otp *totp, index int) string {
+func calculateTOTP(otp *Totp, index int) string {
 	var h hash.Hash
 
 	switch otp.hashFunction {
@@ -258,7 +273,13 @@ func calculateToken(counter []byte, digits int, h hash.Hash) string {
 
 // URL returns a suitable URL, such as for the Google Authenticator app
 // example: otpauth://totp/Example:alice@google.com?secret=JBSWY3DPEHPK3PXP&issuer=Example
-func (otp *totp) URL() string {
+func (otp *Totp) URL() (string, error) {
+
+	// verify the proper initialization
+	if err := totpHasBeenInitialized(otp); err != nil {
+		return "", err
+	}
+
 	secret := base32.StdEncoding.EncodeToString(otp.key)
 	u := url.URL{}
 	v := url.Values{}
@@ -282,7 +303,7 @@ func (otp *totp) URL() string {
 		break
 	}
 	u.RawQuery = v.Encode()
-	return u.String()
+	return u.String(), nil
 }
 
 // QR generates a byte array containing QR code encoded PNG image, with level Q error correction,
@@ -290,8 +311,16 @@ func (otp *totp) URL() string {
 // The QR code should be displayed only the first time the user enabled the Two-Factor authentication.
 // The QR code contains the shared KEY between the server application and the client application,
 // therefore the QR code should be delivered via secure connection.
-func (otp *totp) QR() ([]byte, error) {
-	u := otp.URL()
+func (otp *Totp) QR() ([]byte, error) {
+
+	// get the URL
+	u, err := otp.URL()
+
+	// check for errors during initialization
+	// this is already done on the URL method
+	if err != nil {
+		return nil, err
+	}
 	code, err := qr.Encode(u, qr.Q)
 	if err != nil {
 		return nil, err
@@ -306,7 +335,13 @@ func (otp *totp) QR() ([]byte, error) {
 // TODO:
 // 1- improve sizes. For instance the hashFunction_type could be a short.
 // 2- Encrypt the key, in case it's transferred in the network unsafely
-func (otp *totp) ToBytes() ([]byte, error) {
+func (otp *Totp) ToBytes() ([]byte, error) {
+
+	// check Totp initialization
+	if err := totpHasBeenInitialized(otp); err != nil {
+		return nil, err
+	}
+
 	var buffer bytes.Buffer
 
 	// caluclate the length of the key and create its byte representation
@@ -419,13 +454,13 @@ func (otp *totp) ToBytes() ([]byte, error) {
 // TOTPFromBytes converts a byte array to a totp object
 // it stores the state of the TOTP object, like the key, the current counter, the client offset,
 // the total amount of verification failures and the last time a verification happened
-func TOTPFromBytes(data []byte) (*totp, error) {
+func TOTPFromBytes(data []byte) (*Totp, error) {
 	// fmt.Println("Bytes", len(data))
 	// new reader
 	reader := bytes.NewReader(data)
 
 	// otp object
-	otp := new(totp)
+	otp := new(Totp)
 
 	// get the lenght
 	lenght := make([]byte, 4)
@@ -530,4 +565,12 @@ func TOTPFromBytes(data []byte) (*totp, error) {
 	}
 
 	return otp, err
+}
+
+// this method checks the proper initialization of the Totp object
+func totpHasBeenInitialized(otp *Totp) error {
+	if otp.key == nil || len(otp.key) == 0 {
+		return INITIALIZATION_FAILED
+	}
+	return nil
 }

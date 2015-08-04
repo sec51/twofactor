@@ -72,7 +72,7 @@ func TestTOTP(t *testing.T) {
 	checkError(t, err)
 
 	// create the OTP
-	otp := new(totp)
+	otp := new(Totp)
 	otp.digits = 8
 	otp.issuer = "Sec51"
 	otp.account = "no-reply@sec51.com"
@@ -127,7 +127,10 @@ func TestVerificationFailures(t *testing.T) {
 	}
 
 	// generate a new token
-	expectedToken := otp.OTP()
+	expectedToken, err := otp.OTP()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	//verify the new token
 	if err := otp.Validate(expectedToken); err != nil {
@@ -256,7 +259,15 @@ func TestSerialization(t *testing.T) {
 		t.Error("Deserialized issuer property differ from original TOTP")
 	}
 
-	if deserializedOTP.OTP() != otp.OTP() {
+	deserializedToken, err := deserializedOTP.OTP()
+	if err != nil {
+		t.Error(err)
+	}
+	token, err := otp.OTP()
+	if err != nil {
+		t.Error(err)
+	}
+	if deserializedToken != token {
 		t.Error("Deserialized OTP token property differ from original TOTP")
 	}
 
@@ -264,7 +275,16 @@ func TestSerialization(t *testing.T) {
 		t.Error("Deserialized hash property differ from original TOTP")
 	}
 
-	if deserializedOTP.URL() != otp.URL() {
+	deserializedUrl, err := deserializedOTP.URL()
+	if err != nil {
+		t.Error(err)
+	}
+
+	otpdUrl, err := otp.URL()
+	if err != nil {
+		t.Error(err)
+	}
+	if deserializedUrl != otpdUrl {
 		t.Error("Deserialized URL property differ from original TOTP")
 	}
 
@@ -285,4 +305,11 @@ func TestSerialization(t *testing.T) {
 		t.Error("Creation of TOTP Label failed")
 	}
 
+}
+
+func TestProperInitialization(t *testing.T) {
+	otp := Totp{}
+	if _, err := otp.URL(); err == nil {
+		t.Fatal("Totp is not properly initialized and the method did not catch it")
+	}
 }
