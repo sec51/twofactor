@@ -55,7 +55,7 @@ func (otp *Totp) synchronizeCounter(offset int) {
 
 // Label returns the combination of issuer:account string
 func (otp *Totp) label() string {
-	return url.QueryEscape(fmt.Sprintf("%s:%s", otp.issuer, otp.account))
+	return fmt.Sprintf("%s:%s", url.QueryEscape(otp.issuer), otp.account)
 }
 
 // Counter returns the TOTP's 8-byte counter as unsigned 64-bit integer.
@@ -275,7 +275,7 @@ func calculateToken(counter []byte, digits int, h hash.Hash) string {
 
 // URL returns a suitable URL, such as for the Google Authenticator app
 // example: otpauth://totp/Example:alice@google.com?secret=JBSWY3DPEHPK3PXP&issuer=Example
-func (otp *Totp) URL() (string, error) {
+func (otp *Totp) url() (string, error) {
 
 	// verify the proper initialization
 	if err := totpHasBeenInitialized(otp); err != nil {
@@ -316,7 +316,7 @@ func (otp *Totp) URL() (string, error) {
 func (otp *Totp) QR() ([]byte, error) {
 
 	// get the URL
-	u, err := otp.URL()
+	u, err := otp.url()
 
 	// check for errors during initialization
 	// this is already done on the URL method
