@@ -21,18 +21,18 @@ import (
 )
 
 const (
-	BACKOFF_MINUTES = 5 // this is the time to wait before verifying another token
-	MAX_FAILURES    = 3 // total amount of failures, after that the user needs to wait for the backoff time
-	COUNTER_SIZE    = 8 // this is defined in the RFC 4226
+	backoff_minutes = 5 // this is the time to wait before verifying another token
+	max_failures    = 3 // total amount of failures, after that the user needs to wait for the backoff time
+	counter_size    = 8 // this is defined in the RFC 4226
 )
 
 var (
-	INITIALIZATION_FAILED = errors.New("Totp has not been initialized correctly")
+	initialization_failed_error = errors.New("Totp has not been initialized correctly")
 )
 
 type Totp struct {
 	key                       []byte             // this is the secret key
-	counter                   [COUNTER_SIZE]byte // this is the counter used to synchronize with the client device
+	counter                   [counter_size]byte // this is the counter used to synchronize with the client device
 	digits                    int                // total amount of digits of the code displayed on the device
 	issuer                    string             // the company which issues the 2FA
 	account                   string             // usually the suer email or the account id
@@ -125,11 +125,11 @@ func (otp *Totp) Validate(userCode string) error {
 	}
 
 	// check against the total amount of failures
-	if otp.totalVerificationFailures >= MAX_FAILURES && !validBackoffTime(otp.lastVerificationTime) {
+	if otp.totalVerificationFailures >= max_failures && !validBackoffTime(otp.lastVerificationTime) {
 		return errors.New("The verification is locked down, because of too many trials.")
 	}
 
-	if otp.totalVerificationFailures >= MAX_FAILURES && validBackoffTime(otp.lastVerificationTime) {
+	if otp.totalVerificationFailures >= max_failures && validBackoffTime(otp.lastVerificationTime) {
 		// reset the total verification failures counter
 		otp.totalVerificationFailures = 0
 	}
@@ -174,7 +174,7 @@ func (otp *Totp) Validate(userCode string) error {
 // Checks the time difference between the function call time and the parameter
 // if the difference of time is greater than BACKOFF_MINUTES  it returns true, otherwise false
 func validBackoffTime(lastVerification time.Time) bool {
-	diff := lastVerification.UTC().Add(BACKOFF_MINUTES * time.Minute)
+	diff := lastVerification.UTC().Add(backoff_minutes * time.Minute)
 	return time.Now().UTC().After(diff)
 }
 
@@ -570,7 +570,7 @@ func TOTPFromBytes(data []byte) (*Totp, error) {
 // this method checks the proper initialization of the Totp object
 func totpHasBeenInitialized(otp *Totp) error {
 	if otp.key == nil || len(otp.key) == 0 {
-		return INITIALIZATION_FAILED
+		return initialization_failed_error
 	}
 	return nil
 }
