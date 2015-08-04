@@ -137,8 +137,8 @@ func TestVerificationFailures(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// verify the wrong token for 3 times and check the internal counters values
-	for i := 0; i < 3; i++ {
+	// verify the wrong token for 10 times and check the internal counters values
+	for i := 0; i < 10; i++ {
 		if err := otp.Validate("1234567"); err == nil {
 			t.Fatal(err)
 		}
@@ -155,10 +155,36 @@ func TestVerificationFailures(t *testing.T) {
 		}
 	}
 
-	// set the lastVerificationTime ahead in the future.
+	// test the validBackoffTime function
+	if validBackoffTime(otp.lastVerificationTime) {
+		t.Error("validBackoffTime should return false")
+	}
+
+	// serialize and deserialize the object and verify again
+	data, err := otp.ToBytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	restoredOtp, err := TOTPFromBytes(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// test the validBackoffTime function
+	if validBackoffTime(restoredOtp.lastVerificationTime) {
+		t.Error("validBackoffTime should return false")
+	}
+
+	// set the lastVerificationTime back in the past.
 	// it should at this point pass
 	back10Minutes := time.Duration(-10) * time.Minute
 	otp.lastVerificationTime = time.Now().UTC().Add(back10Minutes)
+
+	// test the validBackoffTime function
+	if !validBackoffTime(otp.lastVerificationTime) {
+		t.Error("validBackoffTime should return true")
+	}
 
 	for i := 0; i < 10; i++ {
 		if err := otp.Validate(expectedToken); err != nil {
@@ -312,4 +338,56 @@ func TestProperInitialization(t *testing.T) {
 	if _, err := otp.url(); err == nil {
 		t.Fatal("Totp is not properly initialized and the method did not catch it")
 	}
+}
+
+func TestCounterSynchronization(t *testing.T) {
+
+	// create totp
+	otp, err := NewTOTP("info@sec51.com", "Sec51", crypto.SHA512, 8)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	token0 := calculateTOTP(otp, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	token_1 := calculateTOTP(otp, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	token1 := calculateTOTP(otp, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = otp.Validate(token0)
+	if err != nil {
+		t.Error(err)
+	}
+	// check the values
+	if otp.clientOffset != 0 {
+		t.Errorf("Client offset should be 0, instead we've got %d\n", otp.clientOffset)
+	}
+
+	err = otp.Validate(token_1)
+	if err != nil {
+		t.Error(err)
+	}
+	// check the values
+	if otp.clientOffset != -1 {
+		t.Errorf("Client offset should be -1, instead we've got %d\n", otp.clientOffset)
+	}
+
+	err = otp.Validate(token1)
+	if err != nil {
+		t.Error(err)
+	}
+	// check the values
+	if otp.clientOffset != 1 {
+		t.Errorf("Client offset should be 0, instead we've got %d\n", otp.clientOffset)
+	}
+
 }

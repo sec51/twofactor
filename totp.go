@@ -27,7 +27,8 @@ const (
 )
 
 var (
-	initialization_failed_error = errors.New("Totp has not been initialized correctly")
+	initializationFailedError = errors.New("Totp has not been initialized correctly")
+	LockDownError             = errors.New("The verification is locked down, because of too many trials.")
 )
 
 // WARNING: The `Totp` struct should never be instantiated manually!
@@ -128,7 +129,7 @@ func (otp *Totp) Validate(userCode string) error {
 
 	// check against the total amount of failures
 	if otp.totalVerificationFailures >= max_failures && !validBackoffTime(otp.lastVerificationTime) {
-		return errors.New("The verification is locked down, because of too many trials.")
+		return LockDownError
 	}
 
 	if otp.totalVerificationFailures >= max_failures && validBackoffTime(otp.lastVerificationTime) {
@@ -145,7 +146,7 @@ func (otp *Totp) Validate(userCode string) error {
 	token0Hash := sha256.Sum256([]byte(calculateTOTP(otp, -1)))
 	token1Hash := sha256.Sum256([]byte(calculateTOTP(otp, 0)))
 	token2Hash := sha256.Sum256([]byte(calculateTOTP(otp, 1)))
-	tokens[0] = hex.EncodeToString(token0Hash[:]) // sha256.Sum256() // 30 seconds ago token
+	tokens[0] = hex.EncodeToString(token0Hash[:]) // 30 seconds ago token
 	tokens[1] = hex.EncodeToString(token1Hash[:]) // current token
 	tokens[2] = hex.EncodeToString(token2Hash[:]) // next 30 seconds token
 
@@ -154,7 +155,7 @@ func (otp *Totp) Validate(userCode string) error {
 		return nil
 	}
 
-	// if the let's say 30 seconds ago token is valid then return nil, but re-synchronize
+	// if the 30 seconds ago token is valid then return nil, but re-synchronize
 	if tokens[0] == userToken {
 		otp.synchronizeCounter(-1)
 		return nil
@@ -191,8 +192,7 @@ func validBackoffTime(lastVerification time.Time) bool {
 func (otp *Totp) incrementCounter(index int) {
 	// Unix returns t as a Unix time, the number of seconds elapsed since January 1, 1970 UTC.
 	counterOffset := time.Duration(index*otp.stepSize) * time.Second
-	clientOffset := time.Duration(otp.clientOffset*otp.stepSize) * time.Second
-	now := time.Now().UTC().Add(counterOffset).Add(clientOffset).Unix()
+	now := time.Now().UTC().Add(counterOffset).Unix()
 	otp.counter = bigEndianUint64(increment(now, otp.stepSize))
 }
 
@@ -572,7 +572,7 @@ func TOTPFromBytes(data []byte) (*Totp, error) {
 // this method checks the proper initialization of the Totp object
 func totpHasBeenInitialized(otp *Totp) error {
 	if otp.key == nil || len(otp.key) == 0 {
-		return initialization_failed_error
+		return initializationFailedError
 	}
 	return nil
 }
