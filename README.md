@@ -15,6 +15,8 @@ This package implements the RFC 6238 OATH-TOTP algorithm;
 
 * Built-in support for secure crypto keys generation
 
+* Built in encryption of the secret keys when converted to bytes, so that they can be safely transmitted over the network, or stored in a DB
+
 * Built-in back-off time when a user fails to authenticate more than 3 times
 
 * Bult-in serialization and deserialization to store the one time token struct in a persistence layer
@@ -32,19 +34,18 @@ This package implements the RFC 6238 OATH-TOTP algorithm;
 
 > **The key crerated is using go crypto random function and it's a cryptographic secret key.**
 > It needs to be protected against unauthorized access and they cannot be leaked.
-> In addition when shared with the client, the connection should be secured.
+> In addition when the QR cide is shared with the client, the connection should be secured.
 
 The `totp` struct can be easily serialized using the `ToBytes()` function. 
-The bytes can then be stored on a persistent layer. Again the secret key needs to be protected.
+The bytes can then be stored on a persistent layer. The bytes are encrypted using `cryptoengine` library (NaCl)
 You can then retrieve the object back with the function: `TOTPFromBytes`
 
-Again if you trannsfer those bytes via a network connection, this should be a secured one.
+> You can transfer the bytes securely via a network connection because they are encrypted and authenticated.
 
 The struct needs to be stored in a persistent layer becase its values, like last token verification time, 
 max user authentication failures, etc.. needs to be preserved.
 The secret key needs to be preserved too, between the user accound and the user device.
 The secret key is used to derive tokens.
-Once more the secret key needs to be safely stored.
 
 ### Upcoming features
 

@@ -13,6 +13,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/sec51/cryptoengine"
 	"hash"
 	"io"
 	"net/url"
@@ -334,9 +335,9 @@ func (otp *Totp) QR() ([]byte, error) {
 // Sizes:         4        4      N     8       4        4        N         4          N      4     4          4               8                 4
 // Format: |total_bytes|key_size|key|counter|digits|issuer_size|issuer|account_size|account|steps|offset|total_failures|verification_time|hashFunction_type|
 // hashFunction_type: 0 = SHA1; 1 = SHA256; 2 = SHA512
+// The data is encrypted using the cryptoengine library (which is a wrapper around the golang NaCl library)
 // TODO:
 // 1- improve sizes. For instance the hashFunction_type could be a short.
-// 2- Encrypt the key, in case it's transferred in the network unsafely
 func (otp *Totp) ToBytes() ([]byte, error) {
 
 	// check Totp initialization
@@ -448,16 +449,45 @@ func (otp *Totp) ToBytes() ([]byte, error) {
 		}
 	}
 
-	//fmt.Println("Total bytes", len(buffer.Bytes()))
-	return buffer.Bytes(), nil
+	// encrypt the TOTP bytes
+	engine, err := cryptoengine.InitCryptoEngine(otp.issuer)
+	if err != nil {
+		return nil, err
+	}
+
+	// encrypt the bytes
+	message, err := engine.NewEncryptedMessage(buffer.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	return message.ToBytes()
 
 }
 
 // TOTPFromBytes converts a byte array to a totp object
 // it stores the state of the TOTP object, like the key, the current counter, the client offset,
 // the total amount of verification failures and the last time a verification happened
-func TOTPFromBytes(data []byte) (*Totp, error) {
-	// fmt.Println("Bytes", len(data))
+func TOTPFromBytes(encryptedMessage []byte, issuer string) (*Totp, error) {
+
+	// parse the data into a message
+	message, err := cryptoengine.MessageFromBytes(encryptedMessage)
+	if err != nil {
+		return nil, err
+	}
+
+	// init the cryptoengine
+	engine, err := cryptoengine.InitCryptoEngine(issuer)
+	if err != nil {
+		return nil, err
+	}
+
+	// decrypt the message
+	data, err := engine.Decrypt(message, nil)
+	if err != nil {
+		return nil, err
+	}
+
 	// new reader
 	reader := bytes.NewReader(data)
 
@@ -466,7 +496,7 @@ func TOTPFromBytes(data []byte) (*Totp, error) {
 
 	// get the lenght
 	lenght := make([]byte, 4)
-	_, err := reader.Read(lenght) // read the 4 bytes for the total lenght
+	_, err = reader.Read(lenght) // read the 4 bytes for the total lenght
 	if err != nil && err != io.EOF {
 		return otp, err
 	}
