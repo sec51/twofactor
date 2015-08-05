@@ -1,12 +1,11 @@
 #### Current test status
 
 [![Build Status](https://travis-ci.org/sec51/twofactor.svg?branch=master)](https://travis-ci.org/sec51/twofactor.svg?branch=master)
+[![GoDoc](https://godoc.org/github.com/golang/gddo?status.svg)](https://godoc.org/github.com/sec51/twofactor/)
 
 ## `totp`
 
-This package implements the RFC 6238 OATH-TOTP algorithm; 
-See also the [godocs](https://godoc.org/github.com/sec51/twofactor/)
-for this package.
+This package implements the RFC 6238 OATH-TOTP algorithm;
 
 ### Installation
 
