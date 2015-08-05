@@ -5,6 +5,7 @@ go:
 
 install:
   - go get "code.google.com/p/rsc/qr"
+  - go get "github.com/sec51/cryptoengine"
 
 script:
   - go test -v ./...
