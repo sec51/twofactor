@@ -1,6 +1,6 @@
 {
 	"ImportPath": "github.com/sec51/twofactor",
-	"GoVersion": "go1.4.2",
+	"GoVersion": "go1.5.1",
 	"Deps": [
 		{
 			"ImportPath": "code.google.com/p/rsc/gf256",
@@ -11,6 +11,38 @@
 			"ImportPath": "code.google.com/p/rsc/qr",
 			"Comment": "null-258",
 			"Rev": "2d8aa6027fab93979a3b4ecdbeb1ba430b489318"
+		},
+		{
+			"ImportPath": "github.com/sec51/convert/smallendian",
+			"Rev": "8ed1f399b5e0a9a9620c74cfd5aec3682d8328ab"
+		},
+		{
+			"ImportPath": "github.com/sec51/cryptoengine",
+			"Rev": "b1ace081988c205e343d4c0b5b026921c9ad0081"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/curve25519",
+			"Rev": "83f1503f771a82af8a31f358eb825e9efb5dae6c"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/hkdf",
+			"Rev": "83f1503f771a82af8a31f358eb825e9efb5dae6c"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/nacl/box",
+			"Rev": "83f1503f771a82af8a31f358eb825e9efb5dae6c"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/nacl/secretbox",
+			"Rev": "83f1503f771a82af8a31f358eb825e9efb5dae6c"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/poly1305",
+			"Rev": "83f1503f771a82af8a31f358eb825e9efb5dae6c"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/salsa20/salsa",
+			"Rev": "83f1503f771a82af8a31f358eb825e9efb5dae6c"
 		}
 	]
 }

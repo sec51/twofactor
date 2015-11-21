@@ -13,6 +13,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/sec51/convert/smallendian"
 	"github.com/sec51/cryptoengine"
 	"hash"
 	"io"
@@ -25,6 +26,7 @@ const (
 	backoff_minutes = 5 // this is the time to wait before verifying another token
 	max_failures    = 3 // total amount of failures, after that the user needs to wait for the backoff time
 	counter_size    = 8 // this is defined in the RFC 4226
+	message_type    = 0 // this is the message type for the crypto engine
 )
 
 var (
@@ -62,7 +64,7 @@ func (otp *Totp) label() string {
 
 // Counter returns the TOTP's 8-byte counter as unsigned 64-bit integer.
 func (otp *Totp) getIntCounter() uint64 {
-	return uint64FromBigEndian(otp.counter)
+	return smallendian.FromUint64(otp.counter)
 }
 
 // This function creates a new TOTP object
@@ -194,14 +196,14 @@ func (otp *Totp) incrementCounter(index int) {
 	// Unix returns t as a Unix time, the number of seconds elapsed since January 1, 1970 UTC.
 	counterOffset := time.Duration(index*otp.stepSize) * time.Second
 	now := time.Now().UTC().Add(counterOffset).Unix()
-	otp.counter = bigEndianUint64(increment(now, otp.stepSize))
+	otp.counter = smallendian.ToUint64(increment(now, otp.stepSize))
 }
 
 // Function which calculates the value of T (see rfc6238)
 func increment(ts int64, stepSize int) uint64 {
 	T := float64(ts / int64(stepSize)) // TODO: improve this conversions
 	n := round(T)                      // round T
-	return n                           // convert n to big endian byte array
+	return n                           // convert n to little endian byte array
 }
 
 // Generates a new one time password with hmac-(HASH-FUNCTION)
@@ -349,18 +351,18 @@ func (otp *Totp) ToBytes() ([]byte, error) {
 
 	// caluclate the length of the key and create its byte representation
 	keySize := len(otp.key)
-	keySizeBytes := bigEndianInt(keySize)
+	keySizeBytes := smallendian.ToInt(keySize) //bigEndianInt(keySize)
 
 	// caluclate the length of the issuer and create its byte representation
 	issuerSize := len(otp.issuer)
-	issuerSizeBytes := bigEndianInt(issuerSize)
+	issuerSizeBytes := smallendian.ToInt(issuerSize)
 
 	// caluclate the length of the account and create its byte representation
 	accountSize := len(otp.account)
-	accountSizeBytes := bigEndianInt(accountSize)
+	accountSizeBytes := smallendian.ToInt(accountSize)
 
 	totalSize := 4 + 4 + keySize + 8 + 4 + 4 + issuerSize + 4 + accountSize + 4 + 4 + 4 + 8 + 4
-	totalSizeBytes := bigEndianInt(totalSize)
+	totalSizeBytes := smallendian.ToInt(totalSize)
 
 	// at this point we are ready to write the data to the byte buffer
 	// total size
@@ -377,13 +379,13 @@ func (otp *Totp) ToBytes() ([]byte, error) {
 	}
 
 	// counter
-	counterBytes := bigEndianUint64(otp.getIntCounter())
+	counterBytes := smallendian.ToUint64(otp.getIntCounter())
 	if _, err := buffer.Write(counterBytes[:]); err != nil {
 		return nil, err
 	}
 
 	// digits
-	digitBytes := bigEndianInt(otp.digits)
+	digitBytes := smallendian.ToInt(otp.digits)
 	if _, err := buffer.Write(digitBytes[:]); err != nil {
 		return nil, err
 	}
@@ -405,25 +407,25 @@ func (otp *Totp) ToBytes() ([]byte, error) {
 	}
 
 	// steps
-	stepsBytes := bigEndianInt(otp.stepSize)
+	stepsBytes := smallendian.ToInt(otp.stepSize)
 	if _, err := buffer.Write(stepsBytes[:]); err != nil {
 		return nil, err
 	}
 
 	// offset
-	offsetBytes := bigEndianInt(otp.clientOffset)
+	offsetBytes := smallendian.ToInt(otp.clientOffset)
 	if _, err := buffer.Write(offsetBytes[:]); err != nil {
 		return nil, err
 	}
 
 	// total_failures
-	totalFailuresBytes := bigEndianInt(otp.totalVerificationFailures)
+	totalFailuresBytes := smallendian.ToInt(otp.totalVerificationFailures)
 	if _, err := buffer.Write(totalFailuresBytes[:]); err != nil {
 		return nil, err
 	}
 
 	// last verification time
-	verificationTimeBytes := bigEndianUint64(uint64(otp.lastVerificationTime.Unix()))
+	verificationTimeBytes := smallendian.ToUint64(uint64(otp.lastVerificationTime.Unix()))
 	if _, err := buffer.Write(verificationTimeBytes[:]); err != nil {
 		return nil, err
 	}
@@ -431,19 +433,19 @@ func (otp *Totp) ToBytes() ([]byte, error) {
 	// has_function_type
 	switch otp.hashFunction {
 	case crypto.SHA256:
-		sha256Bytes := bigEndianInt(1)
+		sha256Bytes := smallendian.ToInt(1)
 		if _, err := buffer.Write(sha256Bytes[:]); err != nil {
 			return nil, err
 		}
 		break
 	case crypto.SHA512:
-		sha512Bytes := bigEndianInt(2)
+		sha512Bytes := smallendian.ToInt(2)
 		if _, err := buffer.Write(sha512Bytes[:]); err != nil {
 			return nil, err
 		}
 		break
 	default:
-		sha1Bytes := bigEndianInt(0)
+		sha1Bytes := smallendian.ToInt(0)
 		if _, err := buffer.Write(sha1Bytes[:]); err != nil {
 			return nil, err
 		}
@@ -455,13 +457,19 @@ func (otp *Totp) ToBytes() ([]byte, error) {
 		return nil, err
 	}
 
-	// encrypt the bytes
-	message, err := engine.NewEncryptedMessage(buffer.Bytes())
+	// init the message to be encrypted
+	message, err := cryptoengine.NewMessage(buffer.String(), message_type)
 	if err != nil {
 		return nil, err
 	}
 
-	return message.ToBytes()
+	// encrypt it
+	encryptedMessage, err := engine.NewEncryptedMessage(message)
+	if err != nil {
+		return nil, err
+	}
+
+	return encryptedMessage.ToBytes()
 
 }
 
@@ -470,12 +478,6 @@ func (otp *Totp) ToBytes() ([]byte, error) {
 // the total amount of verification failures and the last time a verification happened
 func TOTPFromBytes(encryptedMessage []byte, issuer string) (*Totp, error) {
 
-	// parse the data into a message
-	message, err := cryptoengine.MessageFromBytes(encryptedMessage)
-	if err != nil {
-		return nil, err
-	}
-
 	// init the cryptoengine
 	engine, err := cryptoengine.InitCryptoEngine(issuer)
 	if err != nil {
@@ -483,13 +485,13 @@ func TOTPFromBytes(encryptedMessage []byte, issuer string) (*Totp, error) {
 	}
 
 	// decrypt the message
-	data, err := engine.Decrypt(message, nil)
+	data, err := engine.Decrypt(encryptedMessage)
 	if err != nil {
 		return nil, err
 	}
 
 	// new reader
-	reader := bytes.NewReader(data)
+	reader := bytes.NewReader([]byte(data.Text))
 
 	// otp object
 	otp := new(Totp)
@@ -501,7 +503,7 @@ func TOTPFromBytes(encryptedMessage []byte, issuer string) (*Totp, error) {
 		return otp, err
 	}
 
-	totalSize := intFromBigEndian([4]byte{lenght[0], lenght[1], lenght[2], lenght[3]})
+	totalSize := smallendian.FromInt([4]byte{lenght[0], lenght[1], lenght[2], lenght[3]})
 	buffer := make([]byte, totalSize-4)
 	_, err = reader.Read(buffer)
 	if err != nil && err != io.EOF {
@@ -513,7 +515,7 @@ func TOTPFromBytes(encryptedMessage []byte, issuer string) (*Totp, error) {
 	// read key size
 	endOffset := startOffset + 4
 	keyBytes := buffer[startOffset:endOffset]
-	keySize := intFromBigEndian([4]byte{keyBytes[0], keyBytes[1], keyBytes[2], keyBytes[3]})
+	keySize := smallendian.FromInt([4]byte{keyBytes[0], keyBytes[1], keyBytes[2], keyBytes[3]})
 
 	// read the key
 	startOffset = endOffset
@@ -530,13 +532,13 @@ func TOTPFromBytes(encryptedMessage []byte, issuer string) (*Totp, error) {
 	startOffset = endOffset
 	endOffset = startOffset + 4
 	b = buffer[startOffset:endOffset]
-	otp.digits = intFromBigEndian([4]byte{b[0], b[1], b[2], b[3]}) //
+	otp.digits = smallendian.FromInt([4]byte{b[0], b[1], b[2], b[3]}) //
 
 	// read the issuer size
 	startOffset = endOffset
 	endOffset = startOffset + 4
 	b = buffer[startOffset:endOffset]
-	issuerSize := intFromBigEndian([4]byte{b[0], b[1], b[2], b[3]})
+	issuerSize := smallendian.FromInt([4]byte{b[0], b[1], b[2], b[3]})
 
 	// read the issuer string
 	startOffset = endOffset
@@ -547,7 +549,7 @@ func TOTPFromBytes(encryptedMessage []byte, issuer string) (*Totp, error) {
 	startOffset = endOffset
 	endOffset = startOffset + 4
 	b = buffer[startOffset:endOffset]
-	accountSize := intFromBigEndian([4]byte{b[0], b[1], b[2], b[3]})
+	accountSize := smallendian.FromInt([4]byte{b[0], b[1], b[2], b[3]})
 
 	// read the account string
 	startOffset = endOffset
@@ -558,32 +560,32 @@ func TOTPFromBytes(encryptedMessage []byte, issuer string) (*Totp, error) {
 	startOffset = endOffset
 	endOffset = startOffset + 4
 	b = buffer[startOffset:endOffset]
-	otp.stepSize = intFromBigEndian([4]byte{b[0], b[1], b[2], b[3]})
+	otp.stepSize = smallendian.FromInt([4]byte{b[0], b[1], b[2], b[3]})
 
 	// read the offset
 	startOffset = endOffset
 	endOffset = startOffset + 4
 	b = buffer[startOffset:endOffset]
-	otp.clientOffset = intFromBigEndian([4]byte{b[0], b[1], b[2], b[3]})
+	otp.clientOffset = smallendian.FromInt([4]byte{b[0], b[1], b[2], b[3]})
 
 	// read the total failuers
 	startOffset = endOffset
 	endOffset = startOffset + 4
 	b = buffer[startOffset:endOffset]
-	otp.totalVerificationFailures = intFromBigEndian([4]byte{b[0], b[1], b[2], b[3]})
+	otp.totalVerificationFailures = smallendian.FromInt([4]byte{b[0], b[1], b[2], b[3]})
 
 	// read the offset
 	startOffset = endOffset
 	endOffset = startOffset + 8
 	b = buffer[startOffset:endOffset]
-	ts := uint64FromBigEndian([8]byte{b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]})
+	ts := smallendian.FromUint64([8]byte{b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]})
 	otp.lastVerificationTime = time.Unix(int64(ts), 0)
 
 	// read the hash type
 	startOffset = endOffset
 	endOffset = startOffset + 4
 	b = buffer[startOffset:endOffset]
-	hashType := intFromBigEndian([4]byte{b[0], b[1], b[2], b[3]})
+	hashType := smallendian.FromInt([4]byte{b[0], b[1], b[2], b[3]})
 
 	switch hashType {
 	case 1:
