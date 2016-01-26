@@ -14,7 +14,7 @@ import (
 	"fmt"
 	"github.com/sec51/convert/smallendian"
 	"github.com/sec51/cryptoengine"
-	"github.com/sec51/rsc/qr"
+	qr "github.com/sec51/qrcode"
 	"hash"
 	"io"
 	"net/url"
