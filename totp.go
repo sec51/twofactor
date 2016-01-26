@@ -2,7 +2,6 @@ package twofactor
 
 import (
 	"bytes"
-	"code.google.com/p/rsc/qr"
 	"crypto"
 	"crypto/hmac"
 	"crypto/rand"
@@ -15,6 +14,7 @@ import (
 	"fmt"
 	"github.com/sec51/convert/smallendian"
 	"github.com/sec51/cryptoengine"
+	"github.com/sec51/rsc/qr"
 	"hash"
 	"io"
 	"net/url"
