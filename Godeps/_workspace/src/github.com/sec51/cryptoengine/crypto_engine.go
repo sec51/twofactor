@@ -3,22 +3,24 @@ package cryptoengine
 import (
 	"bytes"
 	"crypto/rand"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"golang.org/x/crypto/nacl/box"
 	"golang.org/x/crypto/nacl/secretbox"
 	"log"
+	"math"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
+	"sync"
 )
 
 const (
-	// secretKeyVersion    = 0  // this is the symmetric encryption version
-	// publicKeyVersion    = 1  // this is the asymmetric encryption version
 	nonceSize           = 24 // this is the nonce size, required by NaCl
 	keySize             = 32 // this is the nonce size, required by NaCl
-	rotateSaltAfterDays = 2  // this is the amount of days the salt is valid - if it crosses this amount a new salt is generated
+	rotateSaltAfterDays = 7  // this is the amount of days the salt is valid - if it crosses this amount a new salt is generated
 	tcpVersion          = 0  // this is the current TCP version
 )
 
@@ -52,15 +54,16 @@ var (
 // The object has the methods necessary to execute all the needed functions to encrypt and decrypt a message, both with symmetric and asymmetric
 // crypto
 type CryptoEngine struct {
-	context              string        // this is the context used for the key derivation function and for namespacing the key files
-	publicKey            [keySize]byte // cached asymmetric public key
-	privateKey           [keySize]byte // cached asymmetric private key
-	secretKey            [keySize]byte // secret key used for symmetric encryption
-	peerPublicKey        [keySize]byte // the peer symmetric public key
-	sharedKey            [keySize]byte // this is the precomputed key, between the peer aymmetric public key and the application asymmetric private key. This speeds up things.
-	salt                 [keySize]byte // salt for deriving the random nonces
-	nonceKey             [keySize]byte // this key is used for deriving the random nonces. It's different from the privateKey
-	preSharedInitialized bool          // flag which tells if the preSharedKey has been initialized
+	context          string                   // this is the context used for the key derivation function and for namespacing the key files
+	publicKey        [keySize]byte            // cached asymmetric public key
+	privateKey       [keySize]byte            // cached asymmetric private key
+	secretKey        [keySize]byte            // secret key used for symmetric encryption
+	salt             [keySize]byte            // salt for deriving the random nonces
+	nonceKey         [keySize]byte            // this key is used for deriving the random nonces. It's different from the privateKey
+	mutex            sync.Mutex               // this mutex is used ti make sure that in case the engine is used by multiple thread the pre-shared key is correctly generated
+	preSharedKeysMap map[string][keySize]byte // this map holds the combination hash of peer public key as the map key and the preshared key as value used to encrypt
+	counter          uint64                   // this is the counter which is appended to the HKDF at each call
+	counterMutex     sync.Mutex               // this is the counter mutex for a safe incrementation (TODO: look into atomic)
 }
 
 // This function initialize all the necessary information to carry out a secure communication
@@ -79,7 +82,6 @@ func InitCryptoEngine(communicationIdentifier string) (*CryptoEngine, error) {
 	var err error
 	// create a new crypto engine object
 	ce := new(CryptoEngine)
-	ce.preSharedInitialized = false
 
 	// sanitize the communicationIdentifier
 	ce.context = sanitizeIdentifier(communicationIdentifier)
@@ -110,6 +112,9 @@ func InitCryptoEngine(communicationIdentifier string) (*CryptoEngine, error) {
 		return nil, err
 	}
 	ce.nonceKey = nonceKey
+
+	// init the map
+	ce.preSharedKeysMap = make(map[string][keySize]byte)
 
 	// finally return the CryptoEngine instance
 	return ce, nil
@@ -301,6 +306,25 @@ func sanitizeIdentifier(id string) string {
 	return cleaned
 }
 
+func (engine *CryptoEngine) fetchAndIncrement() string {
+	engine.counterMutex.Lock()
+	defer engine.counterMutex.Unlock()
+
+	// first read the current value
+	// reset the counter
+	if engine.counter == math.MaxUint64 {
+		engine.counter = 0
+	}
+
+	// convert the counter to string
+	counterString := strconv.FormatUint(engine.counter, 10)
+
+	// increment the counter
+	engine.counter += 1
+
+	return counterString
+}
+
 // Gives access to the public key
 func (engine *CryptoEngine) PublicKey() []byte {
 	return engine.publicKey[:]
@@ -312,7 +336,7 @@ func (engine *CryptoEngine) NewEncryptedMessage(msg message) (EncryptedMessage, 
 	m := EncryptedMessage{}
 
 	// derive nonce
-	nonce, err := deriveNonce(engine.nonceKey, engine.salt, engine.context)
+	nonce, err := deriveNonce(engine.nonceKey, engine.salt, engine.context, engine.fetchAndIncrement())
 	if err != nil {
 		return m, err
 	}
@@ -325,7 +349,7 @@ func (engine *CryptoEngine) NewEncryptedMessage(msg message) (EncryptedMessage, 
 	m.data = encryptedData
 
 	// calculate the overall size of the message
-	m.length = uint64(len(m.data) + len(m.nonce))
+	m.length = uint64(len(m.data) + len(m.nonce) + 8)
 
 	return m, nil
 
@@ -336,54 +360,73 @@ func (engine *CryptoEngine) NewEncryptedMessage(msg message) (EncryptedMessage, 
 // If the public key is not privisioned and does not have the required length of 32 bytes it raises an exception.
 func (engine *CryptoEngine) NewEncryptedMessageWithPubKey(msg message, verificationEngine VerificationEngine) (EncryptedMessage, error) {
 
-	var peerPublicKey32 [keySize]byte
-
-	m := EncryptedMessage{}
+	encryptedMessage := EncryptedMessage{}
 
 	// get the peer public key
 	peerPublicKey := verificationEngine.PublicKey()
 
 	// check the size of the peerPublicKey
 	if len(peerPublicKey) != keySize {
-		return m, KeyNotValidError
+		return encryptedMessage, KeyNotValidError
 	}
 
 	// check the peerPublicKey is not empty (all zeros)
 	if bytes.Compare(peerPublicKey[:], emptyKey) == 0 {
-		return m, KeyNotValidError
+		return encryptedMessage, KeyNotValidError
 	}
-
-	// verify the copy succeeded
-	total := copy(peerPublicKey32[:], peerPublicKey[:keySize])
-	if total != keySize {
-		return m, KeyNotValidError
-	}
-
-	// assign the public key to peerPublicKey struct field
-	engine.peerPublicKey = peerPublicKey32
 
 	// derive nonce
-	nonce, err := deriveNonce(engine.nonceKey, engine.salt, engine.context)
+	nonce, err := deriveNonce(engine.nonceKey, engine.salt, engine.context, engine.fetchAndIncrement())
 	if err != nil {
-		return m, err
+		return encryptedMessage, err
 	}
 
-	m.nonce = nonce
+	// set the nonce to the encrypted message
+	encryptedMessage.nonce = nonce
 
-	// precompute the shared key, if it was not already
-	if !engine.preSharedInitialized {
-		box.Precompute(&engine.sharedKey, &engine.peerPublicKey, &engine.privateKey)
-		engine.preSharedInitialized = true
+	// calculate the hash of the peer public key
+	sha224String := fmt.Sprintf("%x", sha256.Sum224(peerPublicKey[:]))
+
+	// lock the mutex
+	engine.mutex.Lock()
+
+	// check if the pre sgared key is already present in the map
+	if preSharedKey, ok := engine.preSharedKeysMap[sha224String]; ok { // means the key is there
+		// unlock the mutex
+		engine.mutex.Unlock()
+
+		// encrypt with the pre-computed key
+		encryptedData := box.SealAfterPrecomputation(nil, msg.toBytes(), &nonce, &preSharedKey)
+
+		// assign the encrypted data to the message
+		encryptedMessage.data = encryptedData
+
+	} else { // means the key is not there
+
+		// generate the key
+		// init the buffer
+		preSharedKey = [keySize]byte{}
+
+		// precompute the share key
+		box.Precompute(&preSharedKey, &peerPublicKey, &engine.privateKey)
+
+		// assign it to the map
+		engine.preSharedKeysMap[sha224String] = preSharedKey
+
+		// unlock the mutex once the map has the sharedKey set
+		engine.mutex.Unlock()
+
+		// encrypt with the pre-computed key
+		encryptedData := box.SealAfterPrecomputation(nil, msg.toBytes(), &nonce, &preSharedKey)
+
+		// assign the encrypted data to the message
+		encryptedMessage.data = encryptedData
 	}
-	encryptedData := box.Seal(nil, msg.toBytes(), &m.nonce, &engine.peerPublicKey, &engine.privateKey)
-
-	// assign the encrypted data to the message
-	m.data = encryptedData
 
 	// calculate the size of the message
-	m.length = uint64(len(m.data) + len(m.nonce))
+	encryptedMessage.length = uint64(len(encryptedMessage.data) + len(encryptedMessage.nonce) + 8)
 
-	return m, nil
+	return encryptedMessage, nil
 
 }
 
@@ -431,36 +474,36 @@ func (engine *CryptoEngine) DecryptWithPublicKey(encryptedBytes []byte, verifica
 		return nil, KeyNotValidError
 	}
 
-	// copy the key
-	if total := copy(engine.peerPublicKey[:], peerPublicKey[:keySize]); total != keySize {
-		return nil, KeyNotValidError
-	}
+	// calculate the hash of the peer public key
+	sha224String := fmt.Sprintf("%x", sha256.Sum224(peerPublicKey[:]))
 
-	// Decrypt with the pre-initialized key
-	if engine.preSharedInitialized {
-		messageBytes, err := decryptWithPreShared(engine, encryptedMessage)
+	// lock the mutex
+	engine.mutex.Lock()
+
+	// check if the pre sgared key is already present in the map
+	if preSharedKey, ok := engine.preSharedKeysMap[sha224String]; ok { // means the key is there
+		// unlock the mutex
+		engine.mutex.Unlock()
+
+		messageBytes, err := decryptWithPreShared(preSharedKey, encryptedMessage)
 		if err != nil {
 			return nil, err
 		}
+		return messageFromBytes(messageBytes)
 
+	} else {
+		// otherwise decrypt with the standard box open function
+		messageBytes, valid := box.Open(nil, encryptedMessage.data, &encryptedMessage.nonce, &peerPublicKey, &engine.privateKey)
+		if !valid {
+			return nil, MessageDecryptionError
+		}
 		return messageFromBytes(messageBytes)
 	}
 
-	// pre-compute the key and decrypt
-	box.Precompute(&engine.sharedKey, &engine.peerPublicKey, &engine.privateKey)
-	engine.preSharedInitialized = true
-
-	messageBytes, err := decryptWithPreShared(engine, encryptedMessage)
-	if err != nil {
-		return nil, err
-	}
-
-	return messageFromBytes(messageBytes)
-
 }
 
-func decryptWithPreShared(engine *CryptoEngine, m EncryptedMessage) ([]byte, error) {
-	if decryptedMessage, valid := box.OpenAfterPrecomputation(nil, m.data, &m.nonce, &engine.sharedKey); !valid {
+func decryptWithPreShared(preSharedKey [keySize]byte, m EncryptedMessage) ([]byte, error) {
+	if decryptedMessage, valid := box.OpenAfterPrecomputation(nil, m.data, &m.nonce, &preSharedKey); !valid {
 		return nil, MessageDecryptionError
 	} else {
 		return decryptedMessage, nil

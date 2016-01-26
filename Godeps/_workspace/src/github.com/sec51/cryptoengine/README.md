@@ -15,7 +15,7 @@ The encryption and decryption phases are the following:
 
 ```
 
-Message -> Encrypt -> EncryptedMessage ->  < = NETWORK = >  <- EncryptedMessage -> Descrypt -> Message
+Message -> Encrypt -> EncryptedMessage -> ToBytes() -> < = NETWORK = >  <- FromBytes() -> EncryptedMessage -> Decrypt -> Message
 
 ```
 

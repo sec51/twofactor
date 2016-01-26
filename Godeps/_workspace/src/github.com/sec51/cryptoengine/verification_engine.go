@@ -6,6 +6,8 @@ import (
 	"fmt"
 )
 
+// The verification engine links two peers basically.
+// It holds the public key and the remote peer public key and the pre-shared key
 type VerificationEngine struct {
 	publicKey        [keySize]byte // the peer public key
 	signingPublicKey [keySize]byte // the peer public signing key => this is not implemented yet, because go does not support Ed25519 signatures yet
@@ -22,7 +24,7 @@ func NewVerificationEngine(context string) (VerificationEngine, error) {
 	}
 
 	// try to load the public key and if it succeed, then return both the keys
-	publicFile := fmt.Sprintf(publicKeySuffixFormat, context)
+	publicFile := fmt.Sprintf(publicKeySuffixFormat, sanitizeIdentifier(context))
 	// if the key exists
 	if keyFileExists(publicFile) {
 		// try to read it
