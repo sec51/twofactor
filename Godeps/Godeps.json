@@ -1,16 +1,15 @@
 {
 	"ImportPath": "github.com/sec51/twofactor",
-	"GoVersion": "go1.5.3",
+	"GoVersion": "go1.6",
+	"GodepVersion": "v62",
 	"Deps": [
 		{
-			"ImportPath": "code.google.com/p/rsc/gf256",
-			"Comment": "null-258",
-			"Rev": "'2d8aa6027fab93979a3b4ecdbeb1ba430b489318'"
+			"ImportPath": "github.com/sec51/convert",
+			"Rev": "8ed1f399b5e0a9a9620c74cfd5aec3682d8328ab"
 		},
 		{
-			"ImportPath": "code.google.com/p/rsc/qr/coding",
-			"Comment": "null-258",
-			"Rev": "'2d8aa6027fab93979a3b4ecdbeb1ba430b489318'"
+			"ImportPath": "github.com/sec51/convert/bigendian",
+			"Rev": "8ed1f399b5e0a9a9620c74cfd5aec3682d8328ab"
 		},
 		{
 			"ImportPath": "github.com/sec51/convert/smallendian",
@@ -18,11 +17,19 @@
 		},
 		{
 			"ImportPath": "github.com/sec51/cryptoengine",
-			"Rev": "e498a1921e25d2b08a85cadc66e3e0c3e0763129"
+			"Rev": "36f5a7d2e2059ebd9e631d8a5d09c250f73975d3"
 		},
 		{
-			"ImportPath": "github.com/sec51/rsc/qr",
-			"Rev": "ccfe198e06521e3835029dbdd1ee3ecd799aa049"
+			"ImportPath": "github.com/sec51/gf256",
+			"Rev": "2454accbeb9e6b0e2e53b01e1d641c7157251ed4"
+		},
+		{
+			"ImportPath": "github.com/sec51/qrcode",
+			"Rev": "b7779abbcaf1ec4de65f586a85fe24db31d45e7c"
+		},
+		{
+			"ImportPath": "github.com/sec51/qrcode/coding",
+			"Rev": "b7779abbcaf1ec4de65f586a85fe24db31d45e7c"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/curve25519",

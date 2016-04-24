@@ -32,9 +32,10 @@ This package implements the RFC 6238 OATH-TOTP algorithm;
 
 ### Storing Keys
 
-> **The key crerated is using go crypto random function and it's a cryptographic secret key.**
-> It needs to be protected against unauthorized access and they cannot be leaked.
-> In addition when the QR cide is shared with the client, the connection should be secured.
+> **The key is created using Golang crypto random function. It's a secret key and therefore**
+> it needs to be protected against unauthorized access. The key cannot be leaked, otherwise the security is complitely compromised.
+> The key is presented to the user in a form of QR Code. Once scanned the key should be revealed again.
+> In addition when the QR cide is shared with the client for scanning, the connection used must be secured.
 
 The `totp` struct can be easily serialized using the `ToBytes()` function. 
 The bytes can then be stored on a persistent layer. The bytes are encrypted using `cryptoengine` library (NaCl)

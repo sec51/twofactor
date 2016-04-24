@@ -9,6 +9,7 @@ import (
 	"crypto/sha512"
 	"encoding/base64"
 	"encoding/hex"
+	"github.com/sec51/convert/bigendian"
 	"net/url"
 	"testing"
 	"time"
@@ -81,7 +82,7 @@ func TestTOTP(t *testing.T) {
 	otp.key = keySha1
 	for index, ts := range timeCounters {
 		counter := increment(ts, 30)
-		otp.counter = bigEndianUint64(counter)
+		otp.counter = bigendian.ToUint64(counter)
 		hash := hmac.New(sha1.New, otp.key)
 		token := calculateToken(otp.counter[:], otp.digits, hash)
 		expected := sha1TestData[index]
@@ -94,7 +95,7 @@ func TestTOTP(t *testing.T) {
 	otp.key = keySha256
 	for index, ts := range timeCounters {
 		counter := increment(ts, 30)
-		otp.counter = bigEndianUint64(counter)
+		otp.counter = bigendian.ToUint64(counter)
 		hash := hmac.New(sha256.New, otp.key)
 		token := calculateToken(otp.counter[:], otp.digits, hash)
 		expected := sha256TestData[index]
@@ -107,7 +108,7 @@ func TestTOTP(t *testing.T) {
 	otp.key = keySha512
 	for index, ts := range timeCounters {
 		counter := increment(ts, 30)
-		otp.counter = bigEndianUint64(counter)
+		otp.counter = bigendian.ToUint64(counter)
 		hash := hmac.New(sha512.New, otp.key)
 		token := calculateToken(otp.counter[:], otp.digits, hash)
 		expected := sha512TestData[index]
@@ -169,6 +170,11 @@ func TestVerificationFailures(t *testing.T) {
 	restoredOtp, err := TOTPFromBytes(data, otp.issuer)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	// maje sure the fields are the same after parsing the token from bytes
+	if otp.label() != restoredOtp.label() {
+		t.Error("Label mismatch between in memory OTP and byte parsed OTP")
 	}
 
 	// test the validBackoffTime function
