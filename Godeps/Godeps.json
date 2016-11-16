@@ -1,7 +1,7 @@
 {
 	"ImportPath": "github.com/sec51/twofactor",
 	"GoVersion": "go1.6",
-	"GodepVersion": "v62",
+	"GodepVersion": "v74",
 	"Deps": [
 		{
 			"ImportPath": "github.com/sec51/convert",
@@ -17,7 +17,7 @@
 		},
 		{
 			"ImportPath": "github.com/sec51/cryptoengine",
-			"Rev": "36f5a7d2e2059ebd9e631d8a5d09c250f73975d3"
+			"Rev": "11617a465c082a1e82359b3c059f018f8dcbfc93"
 		},
 		{
 			"ImportPath": "github.com/sec51/gf256",
