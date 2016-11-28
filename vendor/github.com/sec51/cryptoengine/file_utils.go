@@ -1,27 +1,34 @@
 package cryptoengine
 
 import (
-	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
-	"strconv"
+	"path/filepath"
 )
 
 const (
-	keyPath     = "keys"
 	testKeyPath = "test_keys"
 )
 
 var (
-	osSeparator, _             = strconv.Unquote(strconv.QuoteRuneToASCII(os.PathSeparator))
-	keysFolderPrefixFormat     = fmt.Sprintf("%s%s", keyPath, osSeparator) + "%s"
-	testKeysFolderPrefixFormat = fmt.Sprintf("%s%s", testKeyPath, osSeparator) + "%s"
+	keyPath                    string
+	keysFolderPrefixFormat     string
+	testKeysFolderPrefixFormat string
 )
 
 // create the keys folder if it does not exist, with the proper permission
 func init() {
+	if os.Getenv("SEC51_KEYPATH") != "" {
+		keyPath = os.Getenv("SEC51_KEYPATH")
+	} else {
+		keyPath = "keys"
+	}
+
+	keysFolderPrefixFormat = filepath.Join(keyPath, "%s")
+	testKeysFolderPrefixFormat = filepath.Join(testKeyPath, "%s")
 	if err := createBaseKeyFolder(keyPath); err != nil {
 		log.Println(err)
 	}
@@ -73,9 +80,9 @@ func readKey(filename, pathFormat string) ([keySize]byte, error) {
 	if err != nil {
 		return data32, err
 	}
-	// decode from base64
+	// decode from hex
 	dst := make([]byte, len(data))
-	_, err = base64.StdEncoding.Decode(dst, data)
+	_, err = hex.Decode(dst, data) //.StdEncoding.Decode(dst, data)
 	if err != nil {
 		return data32, err
 	}
@@ -84,10 +91,10 @@ func readKey(filename, pathFormat string) ([keySize]byte, error) {
 	return data32, err
 }
 
-// Write the key file base64 encoded
+// Write the key file hex encoded
 func writeKey(filename, pathFormat string, data []byte) error {
-	dst := make([]byte, base64.StdEncoding.EncodedLen(len(data)))
-	base64.StdEncoding.Encode(dst, data)
+	dst := make([]byte, hex.EncodedLen(len(data))) //StdEncoding.EncodedLen(len(data)))
+	hex.Encode(dst, data)                          // StdEncoding.Encode(dst, data)
 	filePath := fmt.Sprintf(pathFormat, filename)
 	return writeFile(filePath, dst)
 }
