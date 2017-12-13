@@ -12,16 +12,17 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/sec51/convert"
-	"github.com/sec51/convert/bigendian"
-	"github.com/sec51/cryptoengine"
-	qr "github.com/sec51/qrcode"
 	"hash"
 	"io"
 	"math"
 	"net/url"
 	"strconv"
 	"time"
+
+	"github.com/sec51/convert"
+	"github.com/sec51/convert/bigendian"
+	"github.com/sec51/cryptoengine"
+	qr "github.com/sec51/qrcode"
 )
 
 const (
@@ -268,6 +269,14 @@ func calculateToken(counter []byte, digits int, h hash.Hash) string {
 	fmtStr := fmt.Sprintf("%%0%dd", digits)
 
 	return fmt.Sprintf(fmtStr, mod)
+}
+
+// Secret returns the underlying base32 encoded secret.
+// This should only be displayed the first time a user enables 2FA,
+// and should be transmitted over a secure connection.
+// Useful for supporting TOTP clients that don't support QR scanning.
+func (otp *Totp) Secret() string {
+	return base32.StdEncoding.EncodeToString(otp.key)
 }
 
 // URL returns a suitable URL, such as for the Google Authenticator app
