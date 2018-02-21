@@ -45,7 +45,7 @@ type Totp struct {
 	digits                    int                // total amount of digits of the code displayed on the device
 	issuer                    string             // the company which issues the 2FA
 	account                   string             // usually the suer email or the account id
-	stepSize                  int                // by default 30 seconds
+	stepSize                  int                // will default to a minimum of 30 seconds
 	clientOffset              int                // the amount of steps the client is off
 	totalVerificationFailures int                // the total amount of verification failures from the client - by default 10
 	lastVerificationTime      time.Time          // the last verification executed
@@ -80,7 +80,7 @@ func (otp *Totp) getIntCounter() uint64 {
 // it autmatically generates a secret key using the golang crypto rand package. If there is not enough entropy the function returns an error
 // The key is not encrypted in this package. It's a secret key. Therefore if you transfer the key bytes in the network,
 // please take care of protecting the key or in fact all the bytes.
-func NewTOTP(account, issuer string, hash crypto.Hash, digits int) (*Totp, error) {
+func NewTOTP(account, issuer string, hash crypto.Hash, digits, steps int) (*Totp, error) {
 
 	keySize := hash.Size()
 	key := make([]byte, keySize)
@@ -94,19 +94,24 @@ func NewTOTP(account, issuer string, hash crypto.Hash, digits int) (*Totp, error
 		digits = 8
 	}
 
-	return makeTOTP(key, account, issuer, hash, digits)
+	// sanitize the step size
+	if steps <= 0 {
+		steps = 30 // we default to 30 seconds which is the recommended value from the RFC
+	}
+
+	return makeTOTP(key, account, issuer, hash, digits, steps)
 
 }
 
 // Private function which initialize the TOTP so that it's easier to unit test it
 // Used internnaly
-func makeTOTP(key []byte, account, issuer string, hash crypto.Hash, digits int) (*Totp, error) {
+func makeTOTP(key []byte, account, issuer string, hash crypto.Hash, digits, steps int) (*Totp, error) {
 	otp := new(Totp)
 	otp.key = key
 	otp.account = account
 	otp.issuer = issuer
 	otp.digits = digits
-	otp.stepSize = 30 // we set it to 30 seconds which is the recommended value from the RFC
+	otp.stepSize = steps
 	otp.clientOffset = 0
 	otp.hashFunction = hash
 	return otp, nil
