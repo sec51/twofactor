@@ -70,7 +70,20 @@ func (otp *Totp) getIntCounter() uint64 {
 	return bigendian.FromUint64(otp.counter)
 }
 
-// This function creates a new TOTP object
+// NewTOTP This function creates a new TOTP object
+// This is the function which is needed to start the whole process
+// account: usually the user email
+// issuer: the name of the company/service
+// hash: is the crypto function used: crypto.SHA1, crypto.SHA256, crypto.SHA512
+// digits: is the token amount of digits (6 or 7 or 8)
+// it autmatically generates a secret key using the golang crypto rand package. If there is not enough entropy the function returns an error
+// The key is not encrypted in this package. It's a secret key. Therefore if you transfer the key bytes in the network,
+// please take care of protecting the key or in fact all the bytes.
+func NewTOTP(account, issuer string, hash crypto.Hash, digits int) (*Totp, error) {
+	return NewTOTPSteps(account, issuer, hash, digits, 30)
+}
+
+// NewTOTPSteps This function creates a new TOTP object
 // This is the function which is needed to start the whole process
 // account: usually the user email
 // issuer: the name of the company/service
@@ -80,13 +93,12 @@ func (otp *Totp) getIntCounter() uint64 {
 // it autmatically generates a secret key using the golang crypto rand package. If there is not enough entropy the function returns an error
 // The key is not encrypted in this package. It's a secret key. Therefore if you transfer the key bytes in the network,
 // please take care of protecting the key or in fact all the bytes.
-func NewTOTP(account, issuer string, hash crypto.Hash, digits int) (*Totp, error) {
-
+func NewTOTPSteps(account, issuer string, hash crypto.Hash, digits, steps int) (*Totp, error) {
 	keySize := hash.Size()
 	key := make([]byte, keySize)
 	total, err := rand.Read(key)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("TOTP failed to create because there is not enough entropy, we got only %d random bytes", total))
+		return nil, fmt.Errorf("TOTP failed to create because there is not enough entropy, we got only %d random bytes", total)
 	}
 
 	// sanitize the digits range otherwise it may create invalid tokens !
@@ -94,19 +106,18 @@ func NewTOTP(account, issuer string, hash crypto.Hash, digits int) (*Totp, error
 		digits = 8
 	}
 
-	return makeTOTP(key, account, issuer, hash, digits)
-
+	return makeTOTP(key, account, issuer, hash, digits, steps)
 }
 
 // Private function which initialize the TOTP so that it's easier to unit test it
 // Used internnaly
-func makeTOTP(key []byte, account, issuer string, hash crypto.Hash, digits int) (*Totp, error) {
+func makeTOTP(key []byte, account, issuer string, hash crypto.Hash, digits, steps int) (*Totp, error) {
 	otp := new(Totp)
 	otp.key = key
 	otp.account = account
 	otp.issuer = issuer
 	otp.digits = digits
-	otp.stepSize = 30 // we set it to 30 seconds which is the recommended value from the RFC
+	otp.stepSize = steps // we set it to 30 seconds which is the recommended value from the RFC
 	otp.clientOffset = 0
 	otp.hashFunction = hash
 	return otp, nil
