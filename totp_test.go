@@ -9,10 +9,11 @@ import (
 	"crypto/sha512"
 	"encoding/base64"
 	"encoding/hex"
-	"github.com/sec51/convert/bigendian"
 	"net/url"
 	"testing"
 	"time"
+
+	"github.com/sec51/convert/bigendian"
 )
 
 var sha1KeyHex = "3132333435363738393031323334353637383930"
@@ -146,7 +147,7 @@ func TestVerificationFailures(t *testing.T) {
 	}
 
 	if otp.totalVerificationFailures != 3 {
-		t.Errorf("Expected 3 verifcation failures, instead we've got %d\n", otp.totalVerificationFailures)
+		t.Errorf("Expected 3 verification failures, instead we've got %d\n", otp.totalVerificationFailures)
 	}
 
 	// at this point we crossed the max failures, therefore it should always return an error
@@ -172,7 +173,7 @@ func TestVerificationFailures(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// maje sure the fields are the same after parsing the token from bytes
+	// make sure the fields are the same after parsing the token from bytes
 	if otp.label() != restoredOtp.label() {
 		t.Error("Label mismatch between in memory OTP and byte parsed OTP")
 	}
