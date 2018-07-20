@@ -83,6 +83,7 @@ func (otp *Totp) getIntCounter() uint64 {
 // The key is not encrypted in this package. It's a secret key. Therefore if you transfer the key bytes in the network,
 // please take care of protecting the key or in fact all the bytes.
 func NewTOTP(account, issuer string, hash crypto.Hash, digits int) (*Totp, error) {
+	// we set stepSize to 30 seconds which is the recommended value from the RFC
 	return NewTOTPSteps(account, issuer, hash, digits, 30)
 }
 
@@ -92,11 +93,11 @@ func NewTOTP(account, issuer string, hash crypto.Hash, digits int) (*Totp, error
 // issuer: the name of the company/service
 // hash: is the crypto function used: crypto.SHA1, crypto.SHA256, crypto.SHA512
 // digits: is the token amount of digits (6 or 7 or 8)
-// steps: the amount of second the token is valid
+// stepSize: the amount of second the token is valid
 // it autmatically generates a secret key using the golang crypto rand package. If there is not enough entropy the function returns an error
 // The key is not encrypted in this package. It's a secret key. Therefore if you transfer the key bytes in the network,
 // please take care of protecting the key or in fact all the bytes.
-func NewTOTPSteps(account, issuer string, hash crypto.Hash, digits, steps int) (*Totp, error) {
+func NewTOTPSteps(account, issuer string, hash crypto.Hash, digits, stepSize int) (*Totp, error) {
 	keySize := hash.Size()
 	key := make([]byte, keySize)
 	total, err := rand.Read(key)
@@ -109,18 +110,18 @@ func NewTOTPSteps(account, issuer string, hash crypto.Hash, digits, steps int) (
 		digits = 8
 	}
 
-	return makeTOTP(key, account, issuer, hash, digits, steps)
+	return makeTOTP(key, account, issuer, hash, digits, stepSize)
 }
 
 // Private function which initialize the TOTP so that it's easier to unit test it
 // Used internally
-func makeTOTP(key []byte, account, issuer string, hash crypto.Hash, digits, steps int) (*Totp, error) {
+func makeTOTP(key []byte, account, issuer string, hash crypto.Hash, digits, stepSize int) (*Totp, error) {
 	otp := new(Totp)
 	otp.key = key
 	otp.account = account
 	otp.issuer = issuer
 	otp.digits = digits
-	otp.stepSize = steps // we set it to 30 seconds which is the recommended value from the RFC
+	otp.stepSize = stepSize
 	otp.clientOffset = 0
 	otp.hashFunction = hash
 	return otp, nil
@@ -177,7 +178,7 @@ func (otp *Totp) Validate(userCode string) error {
 	return errors.New("Tokens mismatch.")
 }
 
-// Checks if userToken equals with one of generated, re-synchronize if necesary.
+// validates userToken
 func (otp *Totp) validateUserToken(userToken string) bool {
 	// 1 calculate the 3 tokens
 	tokens := make([]string, 3)
@@ -185,22 +186,22 @@ func (otp *Totp) validateUserToken(userToken string) bool {
 	token1Hash := sha256.Sum256([]byte(calculateTOTP(otp, 0)))
 	token2Hash := sha256.Sum256([]byte(calculateTOTP(otp, 1)))
 
-	tokens[0] = hex.EncodeToString(token0Hash[:]) // 30 seconds ago token
+	tokens[0] = hex.EncodeToString(token0Hash[:]) // opt.steps seconds ago token
 	tokens[1] = hex.EncodeToString(token1Hash[:]) // current token
-	tokens[2] = hex.EncodeToString(token2Hash[:]) // next 30 seconds token
+	tokens[2] = hex.EncodeToString(token2Hash[:]) // next opt.steps seconds token
 
 	// if the current time token is valid then, no need to re-sync and return nil
 	if tokens[1] == userToken {
 		return true
 	}
 
-	// if the 30 seconds ago token is valid then return nil, but re-synchronize
+	// if the stepSize seconds ago token is valid then return nil, but re-synchronize
 	if tokens[0] == userToken {
 		otp.synchronizeCounter(-1)
 		return true
 	}
 
-	// if the let's say 30 seconds ago token is valid then return nil, but re-synchronize
+	// if the let's say stepSize seconds ago token is valid then return nil, but re-synchronize
 	if tokens[2] == userToken {
 		otp.synchronizeCounter(1)
 		return true
@@ -646,8 +647,6 @@ func TOTPFromBytes(encryptedMessage []byte, issuer string) (*Totp, error) {
 
 	startOffset = endOffset
 	endOffset = startOffset + 4
-	fmt.Println(endOffset)
-	fmt.Println(totalSize)
 	if endOffset == totalSize {
 		otp.lastUsedOTP = ""
 	} else {
