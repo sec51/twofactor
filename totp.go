@@ -161,21 +161,11 @@ func (otp *Totp) Validate(userCode string) error {
 	userTokenHash := sha256.Sum256([]byte(userCode))
 	userToken := hex.EncodeToString(userTokenHash[:])
 
-	// 1 calculate the 3 tokens
-	tokens := make([]string, 3)
-	token0Hash := sha256.Sum256([]byte(calculateTOTP(otp, -1)))
-	token1Hash := sha256.Sum256([]byte(calculateTOTP(otp, 0)))
-	token2Hash := sha256.Sum256([]byte(calculateTOTP(otp, 1)))
-
-	tokens[0] = hex.EncodeToString(token0Hash[:]) // 30 seconds ago token
-	tokens[1] = hex.EncodeToString(token1Hash[:]) // current token
-	tokens[2] = hex.EncodeToString(token2Hash[:]) // next 30 seconds token
-
 	if otp.lastUsedOTP == userToken {
 		return ErrUsedOTP
 	}
 
-	if otp.veryfiUserToken(tokens, userToken) {
+	if otp.validateUserToken(userToken) {
 		otp.lastUsedOTP = userToken
 		return nil
 	}
@@ -188,20 +178,30 @@ func (otp *Totp) Validate(userCode string) error {
 }
 
 // Checks if userToken equals with one of generated, re-synchronize if necesary.
-func (otp *Totp) veryfiUserToken(generatedTokens []string, userToken string) bool {
+func (otp *Totp) validateUserToken(userToken string) bool {
+	// 1 calculate the 3 tokens
+	tokens := make([]string, 3)
+	token0Hash := sha256.Sum256([]byte(calculateTOTP(otp, -1)))
+	token1Hash := sha256.Sum256([]byte(calculateTOTP(otp, 0)))
+	token2Hash := sha256.Sum256([]byte(calculateTOTP(otp, 1)))
+
+	tokens[0] = hex.EncodeToString(token0Hash[:]) // 30 seconds ago token
+	tokens[1] = hex.EncodeToString(token1Hash[:]) // current token
+	tokens[2] = hex.EncodeToString(token2Hash[:]) // next 30 seconds token
+
 	// if the current time token is valid then, no need to re-sync and return nil
-	if generatedTokens[1] == userToken {
+	if tokens[1] == userToken {
 		return true
 	}
 
 	// if the 30 seconds ago token is valid then return nil, but re-synchronize
-	if generatedTokens[0] == userToken {
+	if tokens[0] == userToken {
 		otp.synchronizeCounter(-1)
 		return true
 	}
 
 	// if the let's say 30 seconds ago token is valid then return nil, but re-synchronize
-	if generatedTokens[2] == userToken {
+	if tokens[2] == userToken {
 		otp.synchronizeCounter(1)
 		return true
 	}
