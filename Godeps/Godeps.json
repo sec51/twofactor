@@ -1,23 +1,27 @@
 {
-	"ImportPath": "github.com/sec51/twofactor",
+	"ImportPath": "github.com/isuruceanu/twofactor",
 	"GoVersion": "go1.6",
-	"GodepVersion": "v74",
+	"GodepVersion": "v79",
 	"Deps": [
 		{
 			"ImportPath": "github.com/sec51/convert",
-			"Rev": "8ed1f399b5e0a9a9620c74cfd5aec3682d8328ab"
+			"Comment": "1.0.1",
+			"Rev": "3276ac712ca35cb9cc9a823b564fdaf89f4ac803"
 		},
 		{
 			"ImportPath": "github.com/sec51/convert/bigendian",
-			"Rev": "8ed1f399b5e0a9a9620c74cfd5aec3682d8328ab"
+			"Comment": "1.0.1",
+			"Rev": "3276ac712ca35cb9cc9a823b564fdaf89f4ac803"
 		},
 		{
 			"ImportPath": "github.com/sec51/convert/smallendian",
-			"Rev": "8ed1f399b5e0a9a9620c74cfd5aec3682d8328ab"
+			"Comment": "1.0.1",
+			"Rev": "3276ac712ca35cb9cc9a823b564fdaf89f4ac803"
 		},
 		{
 			"ImportPath": "github.com/sec51/cryptoengine",
-			"Rev": "11617a465c082a1e82359b3c059f018f8dcbfc93"
+			"Comment": "0.0.1",
+			"Rev": "2306d105a49ec564d9d376570a1881d557fc4a82"
 		},
 		{
 			"ImportPath": "github.com/sec51/gf256",

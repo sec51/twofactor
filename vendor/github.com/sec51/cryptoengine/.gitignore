@@ -4,3 +4,4 @@ keys/*
 cryptoengine
 crashers/
 fuzzing/suppresions/
+vendor/
