@@ -19,7 +19,7 @@ import (
 	"strconv"
 	"time"
 
-	qr "github.com/antjkennedy/qrcode"
+	qr "github.com/gapsquare/qrcode"
 	"github.com/sec51/convert"
 	"github.com/sec51/convert/bigendian"
 	"github.com/sec51/cryptoengine"
@@ -94,7 +94,7 @@ func NewTOTP(account, issuer string, hash crypto.Hash, digits int) (*Totp, error
 // hash: is the crypto function used: crypto.SHA1, crypto.SHA256, crypto.SHA512
 // digits: is the token amount of digits (6 or 7 or 8)
 // stepSize: the amount of second the token is valid
-// it autmatically generates a secret key using the golang crypto rand package. If there is not enough entropy the function returns an error
+// it automatically generates a secret key using the golang crypto rand package. If there is not enough entropy the function returns an error
 // The key is not encrypted in this package. It's a secret key. Therefore if you transfer the key bytes in the network,
 // please take care of protecting the key or in fact all the bytes.
 func NewTOTPSteps(account, issuer string, hash crypto.Hash, digits, stepSize int) (*Totp, error) {

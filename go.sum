@@ -1,10 +1,8 @@
-github.com/antjkennedy/qrcode v0.0.0-20190314160530-0cd546b1d61a h1:EwXEyJLxomU+1KclXK71zmA9gKlxBeJgx/k80lJzqpQ=
-github.com/antjkennedy/qrcode v0.0.0-20190314160530-0cd546b1d61a/go.mod h1:WUZ3qgVez92IJLgO3o1wCICfO91sSPkzvwqb2aDvrwU=
+github.com/gapsquare/qrcode v0.0.0-20200319083126-9383c6b5fc5f h1:EDjLT2pujBkorBcXmY6iJJn6PIKCBPYgXVW+BY+zLZ8=
+github.com/gapsquare/qrcode v0.0.0-20200319083126-9383c6b5fc5f/go.mod h1:cfocwW91cPElD6Us6n4RM+WwtrZcxkZKCjZb2YIKAgw=
 github.com/sec51/convert v0.0.0-20180911111603-3276ac712ca3 h1:Yfrdi593aEpDo/6QADiYyFHmIoPm9zOEtlQAHpo/0xg=
 github.com/sec51/convert v0.0.0-20180911111603-3276ac712ca3/go.mod h1:SRX4rc9r9AHj56zHfvY1XBPwhLU0vFZdIX7HaD1C3z8=
 github.com/sec51/cryptoengine v0.0.0-20180911112225-2306d105a49e h1:HsNjVWYeVdO/zoSfNBwJOs1PuSQCSCkwqW6Lp1TtZGs=
 github.com/sec51/cryptoengine v0.0.0-20180911112225-2306d105a49e/go.mod h1:g7izN9sUffTPdvcrt39y/ZephG5oJ9XizhJxxBOYDL0=
-github.com/sec51/gf256 v0.0.0-20160126143050-2454accbeb9e h1:wKXba8dfsFjbxkMpzZBKt8gkJAMSm1fIf1OSWQFQrVA=
-github.com/sec51/gf256 v0.0.0-20160126143050-2454accbeb9e/go.mod h1:hCjOqSOB9PBw5MdJ+0uSLCBV7FbLy0xwOR+c193HkcE=
 golang.org/x/crypto v0.0.0-20151120201419-beef0f439081 h1:Pmlkv+UkNMx18O/oeAbr4BQZSewYOl1jsf8k7K1cbu4=
 golang.org/x/crypto v0.0.0-20151120201419-beef0f439081/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
