@@ -194,6 +194,7 @@ func TestVerificationFailures(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
+		otp.lastUsedOTP = "" // ignore last used OTP in order to test max failure counter reset
 		if err := otp.Validate(expectedToken); err != nil {
 			t.Fatal(err)
 		}
@@ -205,7 +206,6 @@ func TestVerificationFailures(t *testing.T) {
 			}
 		}
 	}
-
 }
 
 func TestIncrementCounter(t *testing.T) {
@@ -234,6 +234,7 @@ func TestSerialization(t *testing.T) {
 	otp.stepSize = 27
 	otp.lastVerificationTime = time.Now().UTC()
 	otp.clientOffset = 1
+	otp.lastUsedOTP = "123456"
 
 	// Serialize it to bytes
 	otpData, err := otp.ToBytes()
@@ -292,6 +293,10 @@ func TestSerialization(t *testing.T) {
 		t.Error("Deserialized issuer property differ from original TOTP")
 	}
 
+	if deserializedOTP.lastUsedOTP != otp.lastUsedOTP {
+		t.Error("Desearialized lastUsedOTp differ from original TOTP")
+	}
+
 	deserializedToken, err := deserializedOTP.OTP()
 	if err != nil {
 		t.Error(err)
@@ -338,6 +343,69 @@ func TestSerialization(t *testing.T) {
 		t.Error("Creation of TOTP Label failed")
 	}
 
+}
+
+func TestDeseariseTOTPWithoutLastUsedOTPProp(t *testing.T) {
+	initialData := `vwAAAAAAAADnlXU0dBXOrNZzX5ZR0pJHqR7Vdok08ZKaia9GBh/ywIju/yN5//ID72G6XnzlbCvggeyQV1vVeWCIwtX8mWEWWLg59QVR9m5f//YA+UfsGd5LBa6ck7PFZPYL4CI/M/4ATpqbRBjZM47jwAAGmIbXHWJt/T9hznDp7gOFdLRWzCUO4yVsPt24EOwxsc6tUdsQOSK7Wzg/TEAfAe15roWZbPL4KgXDheWmUk3yDbn4DELlK2Pqi6o=`
+	otpBytes, err := base64.StdEncoding.DecodeString(initialData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// create a new TOTP
+	otp, err := TOTPFromBytes(otpBytes, "Sec51")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if otp.lastUsedOTP != "" {
+		t.Error("Deserialized without lastUsedOTP should set it to empty")
+	}
+
+	if otp.issuer != "Sec51" {
+		t.Error("Deserialized issuer differs from Sec51")
+	}
+
+	if otp.totalVerificationFailures != 2 {
+		t.Error("Deserialized totalVerificationFailures should be 2")
+	}
+}
+
+func TestVerificationOnSecondUsedOTP(t *testing.T) {
+	// create a new TOTP
+	totp, err := NewTOTP("info@sec51.com", "Sec51", crypto.SHA512, 8)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// sanity check lastUsedOTP is empty
+	if totp.lastUsedOTP != "" {
+		t.Error("lastUsedOTP should be empty on NewTOTP")
+	}
+
+	otp, err := totp.OTP()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if e := totp.Validate(otp); e != nil {
+		t.Error("Wrong otp")
+	}
+
+	if totp.lastUsedOTP == "" {
+		t.Error("lastUsedOTP should not be empty")
+	}
+
+	// calculate the sha256 of the user code
+	userTokenHash := sha256.Sum256([]byte(otp))
+	userToken := hex.EncodeToString(userTokenHash[:])
+
+	if totp.lastUsedOTP != userToken {
+		t.Error("lastUsedOTP should equals to validated one")
+	}
+	// check for second time
+	if e := totp.Validate(otp); e != ErrUsedOTP {
+		t.Error("Error should equals to ErrUsedOTP")
+	}
 }
 
 func TestProperInitialization(t *testing.T) {
