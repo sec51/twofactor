@@ -167,6 +167,7 @@ func (otp *Totp) Validate(userCode string) error {
 	}
 
 	if otp.validateUserToken(userToken) {
+		otp.totalVerificationFailures = 0
 		otp.lastUsedOTP = userToken
 		return nil
 	}
