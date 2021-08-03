@@ -19,10 +19,10 @@ import (
 	"strconv"
 	"time"
 
+	qr "github.com/gapsquare/qrcode"
 	"github.com/sec51/convert"
 	"github.com/sec51/convert/bigendian"
 	"github.com/sec51/cryptoengine"
-	qr "github.com/sec51/qrcode"
 )
 
 const (
@@ -35,6 +35,7 @@ const (
 var (
 	initializationFailedError = errors.New("Totp has not been initialized correctly")
 	LockDownError             = errors.New("The verification is locked down, because of too many trials.")
+	ErrUsedOTP                = errors.New("This OTP already has been used.")
 )
 
 // WARNING: The `Totp` struct should never be instantiated manually!
@@ -50,6 +51,7 @@ type Totp struct {
 	totalVerificationFailures int                // the total amount of verification failures from the client - by default 10
 	lastVerificationTime      time.Time          // the last verification executed
 	hashFunction              crypto.Hash        // the hash function used in the HMAC construction (sha1 - sha156 - sha512)
+	lastUsedOTP               string             //remember last successfull used OTP to prevent using it twice
 }
 
 // This function is used to synchronize the counter with the client
@@ -70,7 +72,7 @@ func (otp *Totp) getIntCounter() uint64 {
 	return bigendian.FromUint64(otp.counter)
 }
 
-// This function creates a new TOTP object
+// NewTOTP This function creates a new TOTP object
 // This is the function which is needed to start the whole process
 // account: usually the user email
 // issuer: the name of the company/service
@@ -81,12 +83,26 @@ func (otp *Totp) getIntCounter() uint64 {
 // The key is not encrypted in this package. It's a secret key. Therefore if you transfer the key bytes in the network,
 // please take care of protecting the key or in fact all the bytes.
 func NewTOTP(account, issuer string, hash crypto.Hash, digits int) (*Totp, error) {
+	// we set stepSize to 30 seconds which is the recommended value from the RFC
+	return NewTOTPSteps(account, issuer, hash, digits, 30)
+}
 
+// NewTOTPSteps This function creates a new TOTP object
+// This is the function which is needed to start the whole process
+// account: usually the user email
+// issuer: the name of the company/service
+// hash: is the crypto function used: crypto.SHA1, crypto.SHA256, crypto.SHA512
+// digits: is the token amount of digits (6 or 7 or 8)
+// stepSize: the amount of second the token is valid
+// it automatically generates a secret key using the golang crypto rand package. If there is not enough entropy the function returns an error
+// The key is not encrypted in this package. It's a secret key. Therefore if you transfer the key bytes in the network,
+// please take care of protecting the key or in fact all the bytes.
+func NewTOTPSteps(account, issuer string, hash crypto.Hash, digits, stepSize int) (*Totp, error) {
 	keySize := hash.Size()
 	key := make([]byte, keySize)
 	total, err := rand.Read(key)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("TOTP failed to create because there is not enough entropy, we got only %d random bytes", total))
+		return nil, fmt.Errorf("TOTP failed to create because there is not enough entropy, we got only %d random bytes", total)
 	}
 
 	// sanitize the digits range otherwise it may create invalid tokens !
@@ -94,19 +110,18 @@ func NewTOTP(account, issuer string, hash crypto.Hash, digits int) (*Totp, error
 		digits = 8
 	}
 
-	return makeTOTP(key, account, issuer, hash, digits)
-
+	return makeTOTP(key, account, issuer, hash, digits, stepSize)
 }
 
 // Private function which initialize the TOTP so that it's easier to unit test it
 // Used internally
-func makeTOTP(key []byte, account, issuer string, hash crypto.Hash, digits int) (*Totp, error) {
+func makeTOTP(key []byte, account, issuer string, hash crypto.Hash, digits, stepSize int) (*Totp, error) {
 	otp := new(Totp)
 	otp.key = key
 	otp.account = account
 	otp.issuer = issuer
 	otp.digits = digits
-	otp.stepSize = 30 // we set it to 30 seconds which is the recommended value from the RFC
+	otp.stepSize = stepSize
 	otp.clientOffset = 0
 	otp.hashFunction = hash
 	return otp, nil
@@ -147,30 +162,13 @@ func (otp *Totp) Validate(userCode string) error {
 	userTokenHash := sha256.Sum256([]byte(userCode))
 	userToken := hex.EncodeToString(userTokenHash[:])
 
-	// 1 calculate the 3 tokens
-	tokens := make([]string, 3)
-	token0Hash := sha256.Sum256([]byte(calculateTOTP(otp, -1)))
-	token1Hash := sha256.Sum256([]byte(calculateTOTP(otp, 0)))
-	token2Hash := sha256.Sum256([]byte(calculateTOTP(otp, 1)))
-
-	tokens[0] = hex.EncodeToString(token0Hash[:]) // 30 seconds ago token
-	tokens[1] = hex.EncodeToString(token1Hash[:]) // current token
-	tokens[2] = hex.EncodeToString(token2Hash[:]) // next 30 seconds token
-
-	// if the current time token is valid then, no need to re-sync and return nil
-	if tokens[1] == userToken {
-		return nil
+	if otp.lastUsedOTP == userToken {
+		return ErrUsedOTP
 	}
 
-	// if the 30 seconds ago token is valid then return nil, but re-synchronize
-	if tokens[0] == userToken {
-		otp.synchronizeCounter(-1)
-		return nil
-	}
-
-	// if the let's say 30 seconds ago token is valid then return nil, but re-synchronize
-	if tokens[2] == userToken {
-		otp.synchronizeCounter(1)
+	if otp.validateUserToken(userToken) {
+		otp.totalVerificationFailures = 0
+		otp.lastUsedOTP = userToken
 		return nil
 	}
 
@@ -179,6 +177,38 @@ func (otp *Totp) Validate(userCode string) error {
 
 	// if we got here everything is good
 	return errors.New("Tokens mismatch.")
+}
+
+// validates userToken
+func (otp *Totp) validateUserToken(userToken string) bool {
+	// 1 calculate the 3 tokens
+	tokens := make([]string, 3)
+	token0Hash := sha256.Sum256([]byte(calculateTOTP(otp, -1)))
+	token1Hash := sha256.Sum256([]byte(calculateTOTP(otp, 0)))
+	token2Hash := sha256.Sum256([]byte(calculateTOTP(otp, 1)))
+
+	tokens[0] = hex.EncodeToString(token0Hash[:]) // opt.steps seconds ago token
+	tokens[1] = hex.EncodeToString(token1Hash[:]) // current token
+	tokens[2] = hex.EncodeToString(token2Hash[:]) // next opt.steps seconds token
+
+	// if the current time token is valid then, no need to re-sync and return nil
+	if tokens[1] == userToken {
+		return true
+	}
+
+	// if the stepSize seconds ago token is valid then return nil, but re-synchronize
+	if tokens[0] == userToken {
+		otp.synchronizeCounter(-1)
+		return true
+	}
+
+	// if the let's say stepSize seconds ago token is valid then return nil, but re-synchronize
+	if tokens[2] == userToken {
+		otp.synchronizeCounter(1)
+		return true
+	}
+
+	return false
 }
 
 // Checks the time difference between the function call time and the parameter
@@ -337,8 +367,8 @@ func (otp *Totp) QR() ([]byte, error) {
 }
 
 // ToBytes serialises a TOTP object in a byte array
-// Sizes:         4        4      N     8       4        4        N         4          N      4     4          4               8                 4
-// Format: |total_bytes|key_size|key|counter|digits|issuer_size|issuer|account_size|account|steps|offset|total_failures|verification_time|hashFunction_type|
+// Sizes:         4        4      N     8       4        4        N         4          N      4     4          4               8                 4                4                N
+// Format: |total_bytes|key_size|key|counter|digits|issuer_size|issuer|account_size|account|steps|offset|total_failures|verification_time|hashFunction_type|lastusedotp_size|lastusedotp|
 // hashFunction_type: 0 = SHA1; 1 = SHA256; 2 = SHA512
 // The data is encrypted using the cryptoengine library (which is a wrapper around the golang NaCl library)
 // TODO:
@@ -364,7 +394,10 @@ func (otp *Totp) ToBytes() ([]byte, error) {
 	accountSize := len(otp.account)
 	accountSizeBytes := bigendian.ToInt(accountSize)
 
-	totalSize := 4 + 4 + keySize + 8 + 4 + 4 + issuerSize + 4 + accountSize + 4 + 4 + 4 + 8 + 4
+	lastUsedOTPSize := len(otp.lastUsedOTP)
+	lastUsedOTPBytes := bigendian.ToInt(lastUsedOTPSize)
+
+	totalSize := 4 + 4 + keySize + 8 + 4 + 4 + issuerSize + 4 + accountSize + 4 + 4 + 4 + 8 + 4 + 4 + lastUsedOTPSize
 	totalSizeBytes := bigendian.ToInt(totalSize)
 
 	// at this point we are ready to write the data to the byte buffer
@@ -452,6 +485,14 @@ func (otp *Totp) ToBytes() ([]byte, error) {
 		if _, err := buffer.Write(sha1Bytes[:]); err != nil {
 			return nil, err
 		}
+	}
+
+	// lastUsedOTP
+	if _, err := buffer.Write(lastUsedOTPBytes[:]); err != nil {
+		return nil, err
+	}
+	if _, err := buffer.WriteString(otp.lastUsedOTP); err != nil {
+		return nil, err
 	}
 
 	// encrypt the TOTP bytes
@@ -599,6 +640,26 @@ func TOTPFromBytes(encryptedMessage []byte, issuer string) (*Totp, error) {
 		break
 	default:
 		otp.hashFunction = crypto.SHA1
+	}
+
+	// read lastUsedOTP
+	// if endOffset is equal totalSize - means this is old type OTPT without lastUsedOTP
+	// so skip reading just set to empty
+
+	startOffset = endOffset
+	endOffset = startOffset + 4
+	if endOffset == totalSize {
+		otp.lastUsedOTP = ""
+	} else {
+
+		// read the lastUsedOTP size
+		b = buffer[startOffset:endOffset]
+		lastUsedOTPSize := bigendian.FromInt([4]byte{b[0], b[1], b[2], b[3]})
+
+		// read the issuer string
+		startOffset = endOffset
+		endOffset = startOffset + lastUsedOTPSize
+		otp.lastUsedOTP = string(buffer[startOffset:endOffset])
 	}
 
 	return otp, err
