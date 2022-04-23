@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/sec51/convert/bigendian"
+	"github.com/stretchr/testify/assert"
 )
 
 var sha1KeyHex = "3132333435363738393031323334353637383930"
@@ -396,5 +397,7 @@ func TestCounterSynchronization(t *testing.T) {
 	if otp.clientOffset != 1 {
 		t.Errorf("Client offset should be 0, instead we've got %d\n", otp.clientOffset)
 	}
+
+	assert.Nil(t, otp.QRConsole())
 
 }

@@ -22,7 +22,9 @@ import (
 	"github.com/sec51/convert"
 	"github.com/sec51/convert/bigendian"
 	"github.com/sec51/cryptoengine"
-	qr "github.com/sec51/qrcode"
+	qr "github.com/yeqown/go-qrcode/v2"
+	"github.com/yeqown/go-qrcode/writer/standard"
+	"github.com/yeqown/go-qrcode/writer/terminal"
 )
 
 const (
@@ -34,7 +36,8 @@ const (
 
 var (
 	initializationFailedError = errors.New("Totp has not been initialized correctly")
-	LockDownError             = errors.New("The verification is locked down, because of too many trials.")
+	LockDownError             = errors.New("The verification is locked down, because of too many attempts")
+	TotpEntropyError          = errors.New("Failed to initialise Totp. Not enough entropy")
 )
 
 // WARNING: The `Totp` struct should never be instantiated manually!
@@ -55,7 +58,7 @@ type Totp struct {
 // This function is used to synchronize the counter with the client
 // Offset can be a negative number as well
 // Usually it's either -1, 0 or 1
-// This is used internally
+// This is used internally only
 func (otp *Totp) synchronizeCounter(offset int) {
 	otp.clientOffset = offset
 }
@@ -78,15 +81,15 @@ func (otp *Totp) getIntCounter() uint64 {
 // digits: is the token amount of digits (6 or 7 or 8)
 // steps: the amount of second the token is valid
 // it automatically generates a secret key using the golang crypto rand package. If there is not enough entropy the function returns an error
-// The key is not encrypted in this package. It's a secret key. Therefore if you transfer the key bytes in the network,
-// please take care of protecting the key or in fact all the bytes.
+// The key is not encrypted in this package. It's a secret key. Therefore if you transfer the key bytes through the network,
+// make sure you encrypt in transit and also store the key in a safe location
 func NewTOTP(account, issuer string, hash crypto.Hash, digits int) (*Totp, error) {
 
 	keySize := hash.Size()
 	key := make([]byte, keySize)
-	total, err := rand.Read(key)
+	_, err := rand.Read(key)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("TOTP failed to create because there is not enough entropy, we got only %d random bytes", total))
+		return nil, TotpEntropyError
 	}
 
 	// sanitize the digits range otherwise it may create invalid tokens !
@@ -101,15 +104,17 @@ func NewTOTP(account, issuer string, hash crypto.Hash, digits int) (*Totp, error
 // Private function which initialize the TOTP so that it's easier to unit test it
 // Used internally
 func makeTOTP(key []byte, account, issuer string, hash crypto.Hash, digits int) (*Totp, error) {
-	otp := new(Totp)
-	otp.key = key
-	otp.account = account
-	otp.issuer = issuer
-	otp.digits = digits
-	otp.stepSize = 30 // we set it to 30 seconds which is the recommended value from the RFC
-	otp.clientOffset = 0
-	otp.hashFunction = hash
-	return otp, nil
+
+	return &Totp{
+		key:          key,
+		account:      account,
+		issuer:       issuer,
+		digits:       digits,
+		stepSize:     30, // we set it, by default, to 30 seconds which is the recommended value from the RFC
+		clientOffset: 0,  // initial offset can be considered zero
+		hashFunction: hash,
+	}, nil
+
 }
 
 // This function validates the user provided token
@@ -124,7 +129,7 @@ func makeTOTP(key []byte, account, issuer string, hash crypto.Hash, digits int) 
 func (otp *Totp) Validate(userCode string) error {
 
 	// check Totp initialization
-	if err := totpHasBeenInitialized(otp); err != nil {
+	if err := otp.isInitialised(); err != nil {
 		return err
 	}
 
@@ -214,7 +219,7 @@ func increment(ts int64, stepSize int) uint64 {
 func (otp *Totp) OTP() (string, error) {
 
 	// verify the proper initialization
-	if err := totpHasBeenInitialized(otp); err != nil {
+	if err := otp.isInitialised(); err != nil {
 		return "", err
 	}
 
@@ -283,8 +288,8 @@ func (otp *Totp) Secret() string {
 // example: otpauth://totp/Example:alice@google.com?secret=JBSWY3DPEHPK3PXP&issuer=Example
 func (otp *Totp) url() (string, error) {
 
-	// verify the proper initialization
-	if err := totpHasBeenInitialized(otp); err != nil {
+	// verify that TOTP is initialised correctly
+	if err := otp.isInitialised(); err != nil {
 		return "", err
 	}
 
@@ -319,21 +324,69 @@ func (otp *Totp) url() (string, error) {
 // The QR code should be displayed only the first time the user enabled the Two-Factor authentication.
 // The QR code contains the shared KEY between the server application and the client application,
 // therefore the QR code should be delivered via secure connection.
-func (otp *Totp) QR() ([]byte, error) {
+func (otp *Totp) QR(options ...standard.ImageOption) ([]byte, error) {
 
 	// get the URL
-	u, err := otp.url()
+	totpUrl, err := otp.url()
 
 	// check for errors during initialization
 	// this is already done on the URL method
 	if err != nil {
 		return nil, err
 	}
-	code, err := qr.Encode(u, qr.Q)
+
+	// create the qr code
+	qrc, err := qr.New(totpUrl)
 	if err != nil {
+		fmt.Printf("could not generate QRCode: %v", err)
 		return nil, err
 	}
-	return code.PNG(), nil
+
+	// create an in memory buffer
+	data := bytes.Buffer{}
+
+	// create a writercloser
+	qrData := NewQRCodeBytesWriter(&data, options...)
+
+	// store the data in the in-memory buffer
+	if err := qrc.Save(qrData); err != nil {
+		fmt.Printf("could not serialise QRCode to bytes: %v", err)
+		return nil, err
+	}
+
+	// return the data
+	return data.Bytes(), nil
+
+}
+
+/// Prints the QRCode in the console
+func (otp *Totp) QRConsole() error {
+
+	// get the URL
+	totpUrl, err := otp.url()
+
+	// check for errors during initialization
+	// this is already done on the URL method
+	if err != nil {
+		return err
+	}
+
+	// create the qr code
+	qrc, err := qr.New(totpUrl)
+	if err != nil {
+		fmt.Printf("could not generate QRCode: %v", err)
+		return err
+	}
+
+	w := terminal.New()
+
+	if err := qrc.Save(w); err != nil {
+		fmt.Printf("could not print QRCode: %v", err)
+		return err
+	}
+
+	return nil
+
 }
 
 // ToBytes serialises a TOTP object in a byte array
@@ -346,7 +399,7 @@ func (otp *Totp) QR() ([]byte, error) {
 func (otp *Totp) ToBytes() ([]byte, error) {
 
 	// check Totp initialization
-	if err := totpHasBeenInitialized(otp); err != nil {
+	if err := otp.isInitialised(); err != nil {
 		return nil, err
 	}
 
@@ -604,8 +657,9 @@ func TOTPFromBytes(encryptedMessage []byte, issuer string) (*Totp, error) {
 	return otp, err
 }
 
-// this method checks the proper initialization of the Totp object
-func totpHasBeenInitialized(otp *Totp) error {
+// This method checks that the Totp instance is initialized properly
+// It returns nil if the initialisation is OK, an error otherwise
+func (otp *Totp) isInitialised() error {
 	if otp == nil || otp.key == nil || len(otp.key) == 0 {
 		return initializationFailedError
 	}
