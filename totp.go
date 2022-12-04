@@ -277,6 +277,16 @@ func (otp *Totp) Secret() string {
 	return base32.StdEncoding.EncodeToString(otp.key)
 }
 
+// HashFunction returns the hash function used
+func (otp *Totp) HashFunction() crypto.Hash {
+	return otp.hashFunction
+}
+
+// NumDigits returns total amount of digits of the code displayed on the device
+func (otp *Totp) NumDigits() int {
+	return otp.digits
+}
+
 // URL returns a suitable URL, such as for the Google Authenticator app
 // example: otpauth://totp/Example:alice@google.com?secret=JBSWY3DPEHPK3PXP&issuer=Example
 func (otp *Totp) url() (string, error) {
