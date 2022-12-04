@@ -158,7 +158,7 @@ func TestVerificationFailures(t *testing.T) {
 	}
 
 	// test the validBackoffTime function
-	if validBackoffTime(otp.lastVerificationTime) {
+	if validBackOffTime(otp.lastVerificationTime) {
 		t.Error("validBackOffTime should return false")
 	}
 
@@ -179,7 +179,7 @@ func TestVerificationFailures(t *testing.T) {
 	}
 
 	// test the validBackoffTime function
-	if validBackoffTime(restoredOtp.lastVerificationTime) {
+	if validBackOffTime(restoredOtp.lastVerificationTime) {
 		t.Error("validBackoffTime should return false")
 	}
 
@@ -189,7 +189,7 @@ func TestVerificationFailures(t *testing.T) {
 	otp.lastVerificationTime = time.Now().UTC().Add(back10Minutes)
 
 	// test the validBackoffTime function
-	if !validBackoffTime(otp.lastVerificationTime) {
+	if !validBackOffTime(otp.lastVerificationTime) {
 		t.Error("validBackoffTime should return true")
 	}
 
@@ -309,16 +309,16 @@ func TestSerialization(t *testing.T) {
 		t.Error("deserialized hash property differ from original TOTP")
 	}
 
-	deserializedUrl, err := deserializedOTP.url()
+	deserializedURL, err := deserializedOTP.url()
 	if err != nil {
 		t.Error(err)
 	}
 
-	otpdUrl, err := otp.url()
+	otpdURL, err := otp.url()
 	if err != nil {
 		t.Error(err)
 	}
-	if deserializedUrl != otpdUrl {
+	if deserializedURL != otpdURL {
 		t.Error("deserialized url property differ from original TOTP")
 	}
 
@@ -361,7 +361,7 @@ func TestCounterSynchronization(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	token_1 := calculateTOTP(otp, -1)
+	tokenNegative1 := calculateTOTP(otp, -1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -380,7 +380,7 @@ func TestCounterSynchronization(t *testing.T) {
 		t.Errorf("client offset should be 0, instead we've got %d\n", otp.clientOffset)
 	}
 
-	err = otp.Validate(token_1)
+	err = otp.Validate(tokenNegative1)
 	if err != nil {
 		t.Error(err)
 	}
