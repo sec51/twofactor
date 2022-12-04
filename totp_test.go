@@ -147,7 +147,7 @@ func TestVerificationFailures(t *testing.T) {
 	}
 
 	if otp.totalVerificationFailures != 3 {
-		t.Errorf("Expected 3 verification failures, instead we've got %d\n", otp.totalVerificationFailures)
+		t.Errorf("expected 3 verification failures, instead we've got %d\n", otp.totalVerificationFailures)
 	}
 
 	// at this point we crossed the max failures, therefore it should always return an error
@@ -159,7 +159,7 @@ func TestVerificationFailures(t *testing.T) {
 
 	// test the validBackoffTime function
 	if validBackoffTime(otp.lastVerificationTime) {
-		t.Error("validBackoffTime should return false")
+		t.Error("validBackOffTime should return false")
 	}
 
 	// serialize and deserialize the object and verify again
@@ -175,7 +175,7 @@ func TestVerificationFailures(t *testing.T) {
 
 	// make sure the fields are the same after parsing the token from bytes
 	if otp.label() != restoredOtp.label() {
-		t.Error("Label mismatch between in memory OTP and byte parsed OTP")
+		t.Error("label mismatch between in memory OTP and byte parsed OTP")
 	}
 
 	// test the validBackoffTime function
@@ -217,7 +217,7 @@ func TestIncrementCounter(t *testing.T) {
 	result := increment(unixTime.Unix(), 30)
 	expected := uint64(47953379)
 	if result != expected {
-		t.Fatal("Error incrementing counter")
+		t.Fatal("error incrementing counter")
 	}
 
 }
@@ -253,43 +253,44 @@ func TestSerialization(t *testing.T) {
 	}
 
 	if deserializedOTP == nil {
-		t.Error("Could not deserialize back the TOTP object from bytes")
+		t.Error("could not deserialize back the TOTP object from bytes")
+		return
 	}
 
-	if bytes.Compare(deserializedOTP.key, otp.key) != 0 {
-		t.Error("Deserialized digits property differ from original TOTP")
+	if !bytes.Equal(deserializedOTP.key, otp.key) {
+		t.Error("deserialized digits property differ from original TOTP")
 	}
 
 	if deserializedOTP.digits != otp.digits {
-		t.Error("Deserialized digits property differ from original TOTP")
+		t.Error("deserialized digits property differ from original TOTP")
 	}
 
 	if deserializedOTP.totalVerificationFailures != otp.totalVerificationFailures {
-		t.Error("Deserialized totalVerificationFailures property differ from original TOTP")
+		t.Error("deserialized totalVerificationFailures property differ from original TOTP")
 	}
 
 	if deserializedOTP.stepSize != otp.stepSize {
-		t.Error("Deserialized stepSize property differ from original TOTP")
+		t.Error("deserialized stepSize property differ from original TOTP")
 	}
 
 	if deserializedOTP.lastVerificationTime.Unix() != otp.lastVerificationTime.Unix() {
-		t.Error("Deserialized lastVerificationTime property differ from original TOTP")
+		t.Error("deserialized lastVerificationTime property differ from original TOTP")
 	}
 
 	if deserializedOTP.getIntCounter() != otp.getIntCounter() {
-		t.Error("Deserialized counter property differ from original TOTP")
+		t.Error("deserialized counter property differ from original TOTP")
 	}
 
 	if deserializedOTP.clientOffset != otp.clientOffset {
-		t.Error("Deserialized clientOffset property differ from original TOTP")
+		t.Error("deserialized clientOffset property differ from original TOTP")
 	}
 
 	if deserializedOTP.account != otp.account {
-		t.Error("Deserialized account property differ from original TOTP")
+		t.Error("deserialized account property differ from original TOTP")
 	}
 
 	if deserializedOTP.issuer != otp.issuer {
-		t.Error("Deserialized issuer property differ from original TOTP")
+		t.Error("deserialized issuer property differ from original TOTP")
 	}
 
 	deserializedToken, err := deserializedOTP.OTP()
@@ -301,11 +302,11 @@ func TestSerialization(t *testing.T) {
 		t.Error(err)
 	}
 	if deserializedToken != token {
-		t.Error("Deserialized OTP token property differ from original TOTP")
+		t.Error("deserialized OTP token property differ from original TOTP")
 	}
 
 	if deserializedOTP.hashFunction != otp.hashFunction {
-		t.Error("Deserialized hash property differ from original TOTP")
+		t.Error("deserialized hash property differ from original TOTP")
 	}
 
 	deserializedUrl, err := deserializedOTP.url()
@@ -318,15 +319,15 @@ func TestSerialization(t *testing.T) {
 		t.Error(err)
 	}
 	if deserializedUrl != otpdUrl {
-		t.Error("Deserialized URL property differ from original TOTP")
+		t.Error("deserialized url property differ from original TOTP")
 	}
 
 	if deserializedOTP.label() != otp.label() {
-		t.Error("Deserialized Label property differ from original TOTP")
+		t.Error("deserialized label property differ from original TOTP")
 	}
 
 	if base64.StdEncoding.EncodeToString(otpData) != base64.StdEncoding.EncodeToString(deserializedOTPData) {
-		t.Error("Problems encoding TOTP to base64")
+		t.Error("problems encoding TOTP to base64")
 	}
 
 	label, err := url.QueryUnescape(otp.label())
@@ -335,7 +336,7 @@ func TestSerialization(t *testing.T) {
 	}
 
 	if label != "Sec51:info@sec51.com" {
-		t.Error("Creation of TOTP Label failed")
+		t.Error("creation of TOTP Label failed")
 	}
 
 }
@@ -343,7 +344,7 @@ func TestSerialization(t *testing.T) {
 func TestProperInitialization(t *testing.T) {
 	otp := Totp{}
 	if _, err := otp.url(); err == nil {
-		t.Fatal("Totp is not properly initialized and the method did not catch it")
+		t.Fatal("TOTP is not properly initialized and the method did not catch it")
 	}
 }
 
@@ -376,7 +377,7 @@ func TestCounterSynchronization(t *testing.T) {
 	}
 	// check the values
 	if otp.clientOffset != 0 {
-		t.Errorf("Client offset should be 0, instead we've got %d\n", otp.clientOffset)
+		t.Errorf("client offset should be 0, instead we've got %d\n", otp.clientOffset)
 	}
 
 	err = otp.Validate(token_1)
@@ -385,7 +386,7 @@ func TestCounterSynchronization(t *testing.T) {
 	}
 	// check the values
 	if otp.clientOffset != -1 {
-		t.Errorf("Client offset should be -1, instead we've got %d\n", otp.clientOffset)
+		t.Errorf("client offset should be -1, instead we've got %d\n", otp.clientOffset)
 	}
 
 	err = otp.Validate(token1)
@@ -394,7 +395,7 @@ func TestCounterSynchronization(t *testing.T) {
 	}
 	// check the values
 	if otp.clientOffset != 1 {
-		t.Errorf("Client offset should be 0, instead we've got %d\n", otp.clientOffset)
+		t.Errorf("client offset should be 0, instead we've got %d\n", otp.clientOffset)
 	}
 
 }
