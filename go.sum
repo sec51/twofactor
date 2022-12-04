@@ -1,0 +1,10 @@
+github.com/sec51/convert v0.0.0-20151121170152-8ed1f399b5e0 h1:c+Ffq3ZiES6G1HFtiYB1lmLsp5I721z0yAb4SivmjVA=
+github.com/sec51/convert v0.0.0-20151121170152-8ed1f399b5e0/go.mod h1:SRX4rc9r9AHj56zHfvY1XBPwhLU0vFZdIX7HaD1C3z8=
+github.com/sec51/cryptoengine v0.0.0-20161018113558-11617a465c08 h1:S5PhXqtRVsYAocJg3Pgyz2028MDXWL+xognhmlA+lvI=
+github.com/sec51/cryptoengine v0.0.0-20161018113558-11617a465c08/go.mod h1:g7izN9sUffTPdvcrt39y/ZephG5oJ9XizhJxxBOYDL0=
+github.com/sec51/gf256 v0.0.0-20160126143050-2454accbeb9e h1:wKXba8dfsFjbxkMpzZBKt8gkJAMSm1fIf1OSWQFQrVA=
+github.com/sec51/gf256 v0.0.0-20160126143050-2454accbeb9e/go.mod h1:hCjOqSOB9PBw5MdJ+0uSLCBV7FbLy0xwOR+c193HkcE=
+github.com/sec51/qrcode v0.0.0-20160126144534-b7779abbcaf1 h1:CI9zS8HvMiibvXM/F3IthY797GW77fNYgioJl/8Xzzk=
+github.com/sec51/qrcode v0.0.0-20160126144534-b7779abbcaf1/go.mod h1:uPm44Rj3uXSSOvmKmoeRuAUNUgwH2JHW5KIzqFFS/j4=
+golang.org/x/crypto v0.0.0-20151120201419-beef0f439081 h1:Pmlkv+UkNMx18O/oeAbr4BQZSewYOl1jsf8k7K1cbu4=
+golang.org/x/crypto v0.0.0-20151120201419-beef0f439081/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
