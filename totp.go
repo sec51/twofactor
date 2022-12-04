@@ -284,7 +284,7 @@ func (otp *Totp) url() (string, error) {
 		return "", err
 	}
 
-	secret := base32.StdEncoding.EncodeToString(otp.key)
+	secret := otp.Secret()
 	u := url.URL{}
 	v := url.Values{}
 	u.Scheme = "otpauth"
