@@ -309,12 +309,12 @@ func TestSerialization(t *testing.T) {
 		t.Error("deserialized hash property differ from original TOTP")
 	}
 
-	deserializedURL, err := deserializedOTP.url()
+	deserializedURL, err := deserializedOTP.URL()
 	if err != nil {
 		t.Error(err)
 	}
 
-	otpdURL, err := otp.url()
+	otpdURL, err := otp.URL()
 	if err != nil {
 		t.Error(err)
 	}
@@ -343,7 +343,7 @@ func TestSerialization(t *testing.T) {
 
 func TestProperInitialization(t *testing.T) {
 	otp := Totp{}
-	if _, err := otp.url(); err == nil {
+	if _, err := otp.URL(); err == nil {
 		t.Fatal("TOTP is not properly initialized and the method did not catch it")
 	}
 }
