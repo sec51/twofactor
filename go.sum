@@ -8,3 +8,5 @@ github.com/sec51/qrcode v0.0.0-20160126144534-b7779abbcaf1 h1:CI9zS8HvMiibvXM/F3
 github.com/sec51/qrcode v0.0.0-20160126144534-b7779abbcaf1/go.mod h1:uPm44Rj3uXSSOvmKmoeRuAUNUgwH2JHW5KIzqFFS/j4=
 golang.org/x/crypto v0.0.0-20151120201419-beef0f439081 h1:Pmlkv+UkNMx18O/oeAbr4BQZSewYOl1jsf8k7K1cbu4=
 golang.org/x/crypto v0.0.0-20151120201419-beef0f439081/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
+golang.org/x/sync v0.1.0 h1:wsuoTGHzEhffawBOhz5CYhcrV4IdKZbEyZjBMuTp12o=
+golang.org/x/sync v0.1.0/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
