@@ -28,6 +28,7 @@ func ValidRecoveryCode(code string) bool {
 }
 
 // GenerateRecoveryCodes creates 10 recovery codes of the form:
+//
 // abd34-1b24do (using alphabet, of length recoveryCodeLength).
 func GenerateRecoveryCodes() ([]string, error) {
 	byt := make([]byte, 10*recoveryCodeLength)

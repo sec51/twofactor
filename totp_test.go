@@ -63,7 +63,6 @@ func checkError(t *testing.T, err error) {
 }
 
 func TestTOTP(t *testing.T) {
-
 	keySha1, err := hex.DecodeString(sha1KeyHex)
 	checkError(t, err)
 
@@ -117,11 +116,9 @@ func TestTOTP(t *testing.T) {
 			t.Errorf("SHA512 test data, token mismatch. Got %s, expected %s\n", token, expected)
 		}
 	}
-
 }
 
 func TestVerificationFailures(t *testing.T) {
-
 	otp, err := NewTOTP("info@sec51.com", "Sec51", crypto.SHA1, 7)
 	//checkError(t, err)
 	if err != nil {
@@ -205,11 +202,9 @@ func TestVerificationFailures(t *testing.T) {
 			}
 		}
 	}
-
 }
 
 func TestIncrementCounter(t *testing.T) {
-
 	ts := int64(1438601387)
 	unixTime := time.Unix(ts, 0).UTC()
 	// DEBUG
@@ -219,7 +214,6 @@ func TestIncrementCounter(t *testing.T) {
 	if result != expected {
 		t.Fatal("error incrementing counter")
 	}
-
 }
 
 func TestSerialization(t *testing.T) {
@@ -338,7 +332,6 @@ func TestSerialization(t *testing.T) {
 	if label != "Sec51:info@sec51.com" {
 		t.Error("creation of TOTP Label failed")
 	}
-
 }
 
 func TestProperInitialization(t *testing.T) {
@@ -349,7 +342,6 @@ func TestProperInitialization(t *testing.T) {
 }
 
 func TestCounterSynchronization(t *testing.T) {
-
 	// create totp
 	otp, err := NewTOTP("info@sec51.com", "Sec51", crypto.SHA512, 8)
 	if err != nil {
@@ -397,5 +389,4 @@ func TestCounterSynchronization(t *testing.T) {
 	if otp.clientOffset != 1 {
 		t.Errorf("client offset should be 0, instead we've got %d\n", otp.clientOffset)
 	}
-
 }
